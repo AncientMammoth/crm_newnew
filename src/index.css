@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    /*
+      BEFORE: font-family: 'Inter', sans-serif; font-weight: 300;
+      
+      AFTER: Changed to use 'Onest' font with a 'Thin' (100) weight.
+    */
+    background-color: theme('colors.card');
+    color: theme('colors.foreground');
+    font-family: 'Onest', sans-serif;
+    font-weight: 100;
+  }
+}
+
+/* This is the grainy background effect */
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url('https://grainy-gradients.vercel.app/noise.svg');
+  background-repeat: repeat;
+  opacity: 0.1;
+  pointer-events: none;
+  z-index: -1;
+}
