@@ -14,24 +14,28 @@ const sendError = (res, message, err) => {
   res.status(500).json({ error: message, details: err.message });
 };
 
-// --- Admin Authentication Middleware ---
-const adminAuth = async (req, res, next) => {
+// --- Authentication Middleware (Generic) ---
+const authMiddleware = (requiredRole) => async (req, res, next) => {
   const secretKey = req.headers['x-secret-key'];
   if (!secretKey) {
     return res.status(401).json({ error: 'Unauthorized: No secret key provided.' });
   }
   try {
-    const userQuery = 'SELECT user_type FROM users WHERE airtable_id = $1';
+    const userQuery = 'SELECT role FROM users WHERE airtable_id = $1';
     const { rows } = await db.query(userQuery, [secretKey]);
-    if (rows.length > 0 && rows[0].user_type === 'admin') {
+    if (rows.length > 0 && rows[0].role === requiredRole) {
       next();
     } else {
-      res.status(403).json({ error: 'Forbidden: Admin access required.' });
+      res.status(403).json({ error: `Forbidden: ${requiredRole} access required.` });
     }
   } catch (error) {
-    sendError(res, 'Admin auth error', error);
+    sendError(res, 'Authentication error', error);
   }
 };
+
+const adminAuth = authMiddleware('admin');
+const salesExecutiveAuth = authMiddleware('sales_executive');
+const deliveryHeadAuth = authMiddleware('delivery_head');
 
 
 // =================================================================
@@ -43,44 +47,57 @@ app.post("/api/auth/login", async (req, res) => {
         return res.status(400).json({ error: "Secret key is required." });
     }
     try {
-        const userQuery = 'SELECT * FROM users WHERE airtable_id = $1';
-        const userResult = await db.query(userQuery, [secretKey]);
+        let userResult = await db.query('SELECT * FROM users WHERE airtable_id = $1', [secretKey]);
+        let user;
+
+        // If user not found, create a new sales_executive user (for demonstration)
         if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: "User not found." });
+            console.log(`User with secret key ${secretKey} not found. Creating new sales_executive user.`);
+            const newUserQuery = 'INSERT INTO users (airtable_id, user_name, role) VALUES ($1, $2, $3) RETURNING *';
+            const newUserName = `User_${Math.random().toString(36).substring(7)}`; // Generate a random name
+            const newUserRole = 'sales_executive';
+            const insertResult = await db.query(newUserQuery, [secretKey, newUserName, newUserRole]);
+            user = insertResult.rows[0];
+        } else {
+            user = userResult.rows[0];
         }
-        const user = userResult.rows[0];
 
         const accountsQuery = 'SELECT id FROM accounts WHERE account_owner_id = $1';
         const projectsQuery = 'SELECT id FROM projects WHERE project_owner_id = $1';
         const tasksAssignedQuery = 'SELECT id FROM tasks WHERE assigned_to_id = $1';
         const tasksCreatedQuery = 'SELECT id FROM tasks WHERE created_by_id = $1';
         const updatesQuery = 'SELECT id FROM updates WHERE update_owner_id = $1';
+        const deliveryStatusQuery = 'SELECT id FROM all_projects WHERE created_by_user_id = $1'; // New query for delivery statuses
 
         const [
             accountsResult,
             projectsResult,
             tasksAssignedResult,
             tasksCreatedResult,
-            updatesResult
+            updatesResult,
+            deliveryStatusResult // New result
         ] = await Promise.all([
             db.query(accountsQuery, [user.id]),
             db.query(projectsQuery, [user.id]),
             db.query(tasksAssignedQuery, [user.id]),
             db.query(tasksCreatedQuery, [user.id]),
-            db.query(updatesQuery, [user.id])
+            db.query(updatesQuery, [user.id]),
+            db.query(deliveryStatusQuery, [user.id]) // Execute new query
         ]);
 
         res.status(200).json({
             user: {
+                id: user.id, // Include internal user ID
                 airtable_id: user.airtable_id,
                 user_name: user.user_name,
-                user_type: user.user_type,
+                role: user.role, // Use 'role' instead of 'user_type'
             },
             accounts: accountsResult.rows,
             projects: projectsResult.rows,
             tasks_assigned_to: tasksAssignedResult.rows,
             tasks_created_by: tasksCreatedResult.rows,
             updates: updatesResult.rows,
+            delivery_statuses: deliveryStatusResult.rows, // Include new delivery statuses
         });
 
     } catch (err) {
@@ -94,7 +111,7 @@ app.post("/api/auth/login", async (req, res) => {
 // =================================================================
 app.get("/api/admin/users", adminAuth, async (req, res) => {
     try {
-        const result = await db.query('SELECT id, user_name, user_type, airtable_id FROM users');
+        const result = await db.query('SELECT id, user_name, role, airtable_id FROM users'); // Use 'role'
         res.status(200).json(result.rows);
     } catch (error) {
         sendError(res, "Failed to fetch admin users.", error);
@@ -104,7 +121,7 @@ app.get("/api/admin/users", adminAuth, async (req, res) => {
 app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const userQuery = 'SELECT id, user_name, user_type, airtable_id FROM users WHERE id = $1';
+        const userQuery = 'SELECT id, user_name, role, airtable_id FROM users WHERE id = $1'; // Use 'role'
         const accountsQuery = 'SELECT * FROM accounts WHERE account_owner_id = $1 ORDER BY created_at DESC';
         const userResult = await db.query(userQuery, [id]);
         if (userResult.rows.length === 0) return res.status(404).json({ error: "User not found." });
@@ -168,7 +185,7 @@ app.get("/api/admin/projects", adminAuth, async (req, res) => {
         }
         if (status) {
             queryParams.push(status);
-            whereClauses.push(`p.project_status = $${queryParams.length}`);
+            whereClaenses.push(`p.project_status = $${queryParams.length}`);
         }
         if (ownerId) {
             queryParams.push(ownerId);
@@ -275,7 +292,7 @@ app.get("/api/admin/updates", adminAuth, async (req, res) => {
 
 
 // =================================================================
-// --- REGULAR USER ENDPOINTS ---
+// --- REGULAR USER (SALES EXECUTIVE) ENDPOINTS ---
 // =================================================================
 
 app.get("/api/users", async (req, res) => {
@@ -536,6 +553,271 @@ app.patch("/api/tasks/:id", async (req, res) => {
         res.json(rows[0]);
     } catch (err) { sendError(res, "Failed to update task.", err); }
 });
+
+// =================================================================
+// --- DELIVERY STATUS ENDPOINTS (SALES EXECUTIVE) ---
+// =================================================================
+
+// Helper to convert 'Yes'/'No'/'N/A' to boolean/null
+const convertToBooleanOrNull = (value) => {
+  if (value === 'Yes') return true;
+  if (value === 'No') return false;
+  return null; // For 'N/A' or any other value
+};
+
+app.post("/api/delivery-status", salesExecutiveAuth, async (req, res) => {
+    const {
+        crm_project_id,
+        project_type,
+        service_type,
+        number_of_files,
+        deadline,
+        output_format,
+        open_project_files_provided,
+        total_duration_minutes,
+        language_pair,
+        target_language_dialect,
+        voice_match_needed,
+        lip_match_needed,
+        sound_balancing_needed,
+        premix_files_shared,
+        me_files_shared,
+        high_res_video_shared,
+        caption_type,
+        on_screen_editing_required,
+        deliverable,
+        voice_over_gender,
+        source_word_count,
+        source_languages,
+        target_languages,
+        formatting_required
+    } = req.body;
+
+    try {
+        // Get user ID from secretKey in headers
+        const secretKey = req.headers['x-secret-key'];
+        const userRes = await db.query("SELECT id, user_name FROM users WHERE airtable_id = $1", [secretKey]);
+        const created_by_user_id = userRes.rows[0]?.id;
+        const sales_executive_name = userRes.rows[0]?.user_name;
+
+        if (!created_by_user_id) {
+            return res.status(400).json({ error: "User ID not found for the provided secret key." });
+        }
+
+        // Fetch project name from CRM projects table
+        const projectRes = await db.query("SELECT project_name FROM projects WHERE id = $1", [crm_project_id]);
+        const project_name = projectRes.rows[0]?.project_name;
+
+        if (!project_name) {
+            return res.status(400).json({ error: "CRM Project not found." });
+        }
+
+        const query = `
+            INSERT INTO all_projects (
+                crm_project_id, created_by_user_id, project_name, sales_executive_name,
+                project_type, service_type, number_of_files, deadline, output_format,
+                open_project_files_provided, total_duration_minutes, language_pair,
+                target_language_dialect, voice_match_needed, lip_match_needed,
+                sound_balancing_needed, premix_files_shared, me_files_shared,
+                high_res_video_shared, caption_type, on_screen_editing_required,
+                deliverable, voice_over_gender, source_word_count, source_languages,
+                target_languages, formatting_required
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+            RETURNING *;
+        `;
+
+        const values = [
+            crm_project_id,
+            created_by_user_id,
+            project_name,
+            sales_executive_name,
+            project_type,
+            service_type,
+            number_of_files || null,
+            deadline || null,
+            output_format || null,
+            convertToBooleanOrNull(open_project_files_provided),
+            project_type === 'QVO' ? total_duration_minutes || null : null,
+            project_type === 'QVO' ? language_pair || null : null,
+            project_type === 'QVO' ? target_language_dialect || null : null,
+            project_type === 'QVO' ? convertToBooleanOrNull(voice_match_needed) : null,
+            project_type === 'QVO' ? convertToBooleanOrNull(lip_match_needed) : null,
+            project_type === 'QVO' ? convertToBooleanOrNull(sound_balancing_needed) : null,
+            project_type === 'QVO' ? convertToBooleanOrNull(premix_files_shared) : null,
+            project_type === 'QVO' ? convertToBooleanOrNull(me_files_shared) : null,
+            project_type === 'QVO' ? convertToBooleanOrNull(high_res_video_shared) : null,
+            project_type === 'QVO' ? caption_type || null : null,
+            project_type === 'QVO' ? convertToBooleanOrNull(on_screen_editing_required) : null,
+            project_type === 'QVO' ? deliverable || null : null,
+            project_type === 'QVO' ? voice_over_gender || null : null,
+            project_type === 'DT' ? source_word_count || null : null,
+            project_type === 'DT' ? source_languages || null : null,
+            project_type === 'DT' ? target_languages || null : null,
+            project_type === 'DT' ? convertToBooleanOrNull(formatting_required) : null
+        ];
+
+        const { rows } = await db.query(query, values);
+        res.status(201).json(rows[0]);
+    } catch (err) {
+        sendError(res, 'Failed to create project delivery status.', err);
+    }
+});
+
+app.put("/api/delivery-status/:id", salesExecutiveAuth, async (req, res) => {
+    const { id } = req.params;
+    const fields = req.body;
+
+    try {
+        const secretKey = req.headers['x-secret-key'];
+        const userRes = await db.query("SELECT id FROM users WHERE airtable_id = $1", [secretKey]);
+        const created_by_user_id = userRes.rows[0]?.id;
+
+        if (!created_by_user_id) {
+            return res.status(400).json({ error: "User ID not found for the provided secret key." });
+        }
+
+        // Ensure the user is only updating their own delivery status
+        const checkOwnershipQuery = 'SELECT created_by_user_id FROM all_projects WHERE id = $1';
+        const ownershipResult = await db.query(checkOwnershipQuery, [id]);
+
+        if (ownershipResult.rows.length === 0) {
+            return res.status(404).json({ error: "Delivery status not found." });
+        }
+        if (ownershipResult.rows[0].created_by_user_id !== created_by_user_id) {
+            return res.status(403).json({ error: "Forbidden: You can only update your own delivery statuses." });
+        }
+
+        const setClauses = [];
+        const values = [];
+        let paramIndex = 1;
+
+        for (const key in fields) {
+            if (fields.hasOwnProperty(key)) {
+                let value = fields[key];
+                // Handle boolean conversions
+                if (['open_project_files_provided', 'voice_match_needed', 'lip_match_needed', 
+                     'sound_balancing_needed', 'premix_files_shared', 'me_files_shared', 
+                     'high_res_video_shared', 'on_screen_editing_required', 'formatting_required'].includes(key)) {
+                    value = convertToBooleanOrNull(value);
+                }
+                setClauses.push(`${key} = $${paramIndex}`);
+                values.push(value);
+                paramIndex++;
+            }
+        }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ error: "No fields provided for update." });
+        }
+
+        values.push(id); // Add id for WHERE clause
+        const query = `UPDATE all_projects SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *;`;
+
+        const { rows } = await db.query(query, values);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Delivery status not found or no update was made." });
+        }
+        res.status(200).json(rows[0]);
+    } catch (err) {
+        sendError(res, 'Failed to update project delivery status.', err);
+    }
+});
+
+app.get("/api/delivery-status/my", salesExecutiveAuth, async (req, res) => {
+    try {
+        const secretKey = req.headers['x-secret-key'];
+        const userRes = await db.query("SELECT id FROM users WHERE airtable_id = $1", [secretKey]);
+        const created_by_user_id = userRes.rows[0]?.id;
+
+        if (!created_by_user_id) {
+            return res.status(400).json({ error: "User ID not found for the provided secret key." });
+        }
+
+        const { ids } = req.query; // Optional: allow filtering by specific IDs
+        let query = `
+            SELECT ap.*, p.project_name, u.user_name as sales_executive_name
+            FROM all_projects ap
+            LEFT JOIN projects p ON ap.crm_project_id = p.id
+            LEFT JOIN users u ON ap.created_by_user_id = u.id
+            WHERE ap.created_by_user_id = $1
+        `;
+        const queryParams = [created_by_user_id];
+
+        if (ids) {
+            const idArray = ids.split(',').map(Number);
+            query += ` AND ap.id = ANY($2::integer[])`;
+            queryParams.push(idArray);
+        }
+        query += ` ORDER BY ap.created_at DESC;`;
+
+        const { rows } = await db.query(query, queryParams);
+        res.status(200).json(rows);
+    } catch (error) {
+        sendError(res, "Failed to fetch user's project delivery statuses.", error);
+    }
+});
+
+// =================================================================
+// --- DELIVERY HEAD ENDPOINTS ---
+// =================================================================
+
+app.get("/api/delivery-head/delivery-status", deliveryHeadAuth, async (req, res) => {
+    try {
+        const { search, projectType, serviceType } = req.query;
+        let query = `
+            SELECT ap.*, p.project_name, u.user_name as sales_executive_name
+            FROM all_projects ap
+            LEFT JOIN projects p ON ap.crm_project_id = p.id
+            LEFT JOIN users u ON ap.created_by_user_id = u.id
+        `;
+        const queryParams = [];
+        const whereClauses = [];
+
+        if (search) {
+            queryParams.push(`%${search}%`);
+            whereClauses.push(`(p.project_name ILIKE $${queryParams.length} OR ap.service_type ILIKE $${queryParams.length} OR u.user_name ILIKE $${queryParams.length})`);
+        }
+        if (projectType) {
+            queryParams.push(projectType);
+            whereClauses.push(`ap.project_type = $${queryParams.length}`);
+        }
+        if (serviceType) {
+            queryParams.push(serviceType);
+            whereClauses.push(`ap.service_type ILIKE $${queryParams.length}`);
+        }
+
+        if (whereClauses.length > 0) {
+            query += " WHERE " + whereClauses.join(" AND ");
+        }
+        query += " ORDER BY ap.created_at DESC;";
+
+        const { rows } = await db.query(query, queryParams);
+        res.status(200).json(rows);
+    } catch (error) {
+        sendError(res, "Failed to fetch all project delivery statuses for delivery head.", error);
+    }
+});
+
+app.get("/api/delivery-head/delivery-status/:id", deliveryHeadAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT ap.*, p.project_name, u.user_name as sales_executive_name
+            FROM all_projects ap
+            LEFT JOIN projects p ON ap.crm_project_id = p.id
+            LEFT JOIN users u ON ap.created_by_user_id = u.id
+            WHERE ap.id = $1;
+        `;
+        const { rows } = await db.query(query, [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Project delivery status not found." });
+        }
+        res.status(200).json(rows[0]);
+    } catch (error) {
+        sendError(res, "Failed to fetch project delivery status details for delivery head.", error);
+    }
+});
+
 
 // Export the app for Vercel
 module.exports = app;

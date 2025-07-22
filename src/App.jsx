@@ -32,32 +32,49 @@ import AdminAccountDetail from './pages/AdminAccountDetail';
 import AdminProjectDetail from './pages/AdminProjectDetail';
 import AdminCreateTask from './pages/AdminCreateTask';
 import AdminMyTasks from './pages/AdminMyTasks';
-import AdminTaskDetail from './pages/AdminTaskDetail'; // This import will now work
+import AdminTaskDetail from './pages/AdminTaskDetail';
+
+// New Delivery Head Component Imports
+import DeliveryHeadLayout from './components/layout/DeliveryHeadLayout';
+import DeliveryHeadDashboard from './pages/DeliveryHeadDashboard';
+import DeliveryProjectList from './pages/DeliveryProjectList';
+import DeliveryProjectDetail from './pages/DeliveryProjectDetail';
+
+// New Sales Executive Delivery Pages
+import ProjectDeliveryForm from './pages/ProjectDeliveryForm';
+import MyProjectDeliveries from './pages/MyProjectDeliveries';
+
 
 // Route Guards and Redirects
-function PrivateRoute({ children }) {
+function PrivateRoute({ children, allowedRoles }) {
   const secretKey = localStorage.getItem("secretKey");
+  const userRole = localStorage.getItem("userRole"); // Get user role from local storage
+
   if (!secretKey) {
     return <Navigate to="/login" />;
   }
+
+  // Check if the user's role is allowed for this route
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
+    // If not allowed, redirect to home or login based on whether they are logged in
+    return <Navigate to={userRole === 'admin' ? '/admin/dashboard' : userRole === 'delivery_head' ? '/delivery-head/dashboard' : '/home'} />;
+  }
+
   return children;
 }
 
-function AdminPrivateRoute({ children }) {
-    const isAdmin = localStorage.getItem("isAdmin") === "true";
-    const secretKey = localStorage.getItem("secretKey");
-    if (!secretKey || !isAdmin) {
-        return <Navigate to="/login" />;
-    }
-    return children;
-}
-
 function HomeRedirect() {
-    const isAdmin = localStorage.getItem("isAdmin") === "true";
+    const userRole = localStorage.getItem("userRole");
     const secretKey = localStorage.getItem("secretKey");
 
     if (secretKey) {
-        return isAdmin ? <Navigate to="/admin/dashboard" /> : <Navigate to="/home" />;
+        if (userRole === "admin") {
+            return <Navigate to="/admin/dashboard" />;
+        } else if (userRole === "delivery_head") {
+            return <Navigate to="/delivery-head/dashboard" />;
+        } else {
+            return <Navigate to="/home" />; // Default for sales_executive
+        }
     }
     
     return <Navigate to="/login" />;
@@ -69,11 +86,11 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<HomeRedirect />} />
 
-      {/* Standard User Routes */}
+      {/* Standard User (Sales Executive) Routes */}
       <Route
         path="/"
         element={
-          <PrivateRoute>
+          <PrivateRoute allowedRoles={['sales_executive']}>
             <DashboardLayout />
           </PrivateRoute>
         }
@@ -92,15 +109,19 @@ export default function App() {
         <Route path="create-task" element={<CreateTask />} />
         <Route path="my-tasks" element={<Tasks />} />
         <Route path="tasks/:taskId" element={<TaskDetail />} />
+        {/* New Delivery Status Routes for Sales Executive */}
+        <Route path="delivery" element={<MyProjectDeliveries />} /> {/* List of their own deliveries */}
+        <Route path="delivery/create" element={<ProjectDeliveryForm />} /> {/* Form to create/edit */}
+        <Route path="delivery/edit/:id" element={<ProjectDeliveryForm />} /> {/* Edit existing delivery status */}
       </Route>
 
       {/* Admin Routes */}
       <Route
         path="/admin"
         element={
-          <AdminPrivateRoute>
+          <PrivateRoute allowedRoles={['admin']}>
             <AdminLayout />
-          </AdminPrivateRoute>
+          </PrivateRoute>
         }
       >
         <Route path="dashboard" element={<AdminDashboard />} />
@@ -115,6 +136,20 @@ export default function App() {
         <Route path="my-tasks" element={<AdminMyTasks />} />
         <Route path="create-task" element={<AdminCreateTask />} />
         <Route path="updates" element={<AdminUpdateList />} />
+      </Route>
+
+      {/* Delivery Head Routes */}
+      <Route
+        path="/delivery-head"
+        element={
+          <PrivateRoute allowedRoles={['delivery_head']}>
+            <DeliveryHeadLayout />
+          </PrivateRoute>
+        }
+      >
+        <Route path="dashboard" element={<DeliveryHeadDashboard />} />
+        <Route path="projects" element={<DeliveryProjectList />} />
+        <Route path="projects/:id" element={<DeliveryProjectDetail />} />
       </Route>
     </Routes>
   );
