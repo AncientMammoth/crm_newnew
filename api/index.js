@@ -9,27 +9,33 @@ app.use(cors());
 app.use(express.json());
 
 // --- Helper Functions ---
-const sendError = (res, message, err) => {
-  console.error(message, err);
+// Enhanced sendError to include path for better debugging in logs
+const sendError = (res, message, err, path = 'N/A') => {
+  console.error(`[ERROR] Path: ${path} - ${message}`, err);
   res.status(500).json({ error: message, details: err.message });
 };
 
 // --- Authentication Middleware (Generic) ---
+// This middleware now explicitly checks the user's role against requiredRole.
 const authMiddleware = (requiredRole) => async (req, res, next) => {
   const secretKey = req.headers['x-secret-key'];
   if (!secretKey) {
+    console.log(`[AUTH] Path: ${req.path} - Unauthorized: No secret key provided.`);
     return res.status(401).json({ error: 'Unauthorized: No secret key provided.' });
   }
   try {
     const userQuery = 'SELECT role FROM users WHERE airtable_id = $1';
     const { rows } = await db.query(userQuery, [secretKey]);
+    
     if (rows.length > 0 && rows[0].role === requiredRole) {
+      console.log(`[AUTH] Path: ${req.path} - User with role '${rows[0].role}' authorized for '${requiredRole}'.`);
       next();
     } else {
+      console.log(`[AUTH] Path: ${req.path} - Forbidden: User role '${rows.length > 0 ? rows[0].role : 'N/A'}' does not match required role '${requiredRole}'.`);
       res.status(403).json({ error: `Forbidden: ${requiredRole} access required.` });
     }
   } catch (error) {
-    sendError(res, 'Authentication error', error);
+    sendError(res, 'Authentication error', error, req.path);
   }
 };
 
@@ -43,31 +49,46 @@ const deliveryHeadAuth = authMiddleware('delivery_head');
 // =================================================================
 app.post("/api/auth/login", async (req, res) => {
     const { secretKey } = req.body;
+    console.log(`[LOGIN] Attempting login for secretKey: ${secretKey ? secretKey.substring(0, 5) + '...' : 'N/A'}`);
+    
     if (!secretKey) {
+        console.log('[LOGIN] Secret key is missing from request body.');
         return res.status(400).json({ error: "Secret key is required." });
     }
+
     try {
         let userResult = await db.query('SELECT * FROM users WHERE airtable_id = $1', [secretKey]);
         let user;
 
-        // If user not found, create a new sales_executive user (for demonstration)
+        // If user not found, create a new sales_executive user
         if (userResult.rows.length === 0) {
-            console.log(`User with secret key ${secretKey} not found. Creating new sales_executive user.`);
-            const newUserQuery = 'INSERT INTO users (airtable_id, user_name, role) VALUES ($1, $2, $3) RETURNING *';
+            console.log(`[LOGIN] User with secret key ${secretKey.substring(0, 5) + '...'} not found. Creating new user as 'sales_executive'.`);
             const newUserName = `User_${Math.random().toString(36).substring(7)}`; // Generate a random name
-            const newUserRole = 'sales_executive';
-            const insertResult = await db.query(newUserQuery, [secretKey, newUserName, newUserRole]);
+            const defaultRole = 'sales_executive'; // Default role for new users
+            const insertResult = await db.query(
+                'INSERT INTO users (airtable_id, user_name, role) VALUES ($1, $2, $3) RETURNING *',
+                [secretKey, newUserName, defaultRole]
+            );
             user = insertResult.rows[0];
+            console.log(`[LOGIN] New user created: ID: ${user.id}, Name: ${user.user_name}, Role: ${user.role}`);
         } else {
             user = userResult.rows[0];
+            console.log(`[LOGIN] User found: ID: ${user.id}, Name: ${user.user_name}, Role: ${user.role}`);
+            // Ensure existing user has a role, default to sales_executive if null/empty
+            if (!user.role) {
+                console.log(`[LOGIN] User ${user.user_name} has no role. Defaulting to 'sales_executive'.`);
+                await db.query('UPDATE users SET role = $1 WHERE id = $2', ['sales_executive', user.id]);
+                user.role = 'sales_executive';
+            }
         }
 
+        // Fetch associated data for the user
         const accountsQuery = 'SELECT id FROM accounts WHERE account_owner_id = $1';
         const projectsQuery = 'SELECT id FROM projects WHERE project_owner_id = $1';
         const tasksAssignedQuery = 'SELECT id FROM tasks WHERE assigned_to_id = $1';
         const tasksCreatedQuery = 'SELECT id FROM tasks WHERE created_by_id = $1';
         const updatesQuery = 'SELECT id FROM updates WHERE update_owner_id = $1';
-        const deliveryStatusQuery = 'SELECT id FROM all_projects WHERE created_by_user_id = $1'; // New query for delivery statuses
+        const deliveryStatusQuery = 'SELECT id FROM all_projects WHERE created_by_user_id = $1';
 
         const [
             accountsResult,
@@ -75,33 +96,34 @@ app.post("/api/auth/login", async (req, res) => {
             tasksAssignedResult,
             tasksCreatedResult,
             updatesResult,
-            deliveryStatusResult // New result
+            deliveryStatusResult
         ] = await Promise.all([
             db.query(accountsQuery, [user.id]),
             db.query(projectsQuery, [user.id]),
             db.query(tasksAssignedQuery, [user.id]),
             db.query(tasksCreatedQuery, [user.id]),
             db.query(updatesQuery, [user.id]),
-            db.query(deliveryStatusQuery, [user.id]) // Execute new query
+            db.query(deliveryStatusQuery, [user.id])
         ]);
 
         res.status(200).json({
             user: {
-                id: user.id, // Include internal user ID
+                id: user.id,
                 airtable_id: user.airtable_id,
                 user_name: user.user_name,
-                role: user.role, // Use 'role' instead of 'user_type'
+                role: user.role,
             },
             accounts: accountsResult.rows,
             projects: projectsResult.rows,
             tasks_assigned_to: tasksAssignedResult.rows,
             tasks_created_by: tasksCreatedResult.rows,
             updates: updatesResult.rows,
-            delivery_statuses: deliveryStatusResult.rows, // Include new delivery statuses
+            delivery_statuses: deliveryStatusResult.rows,
         });
+        console.log(`[LOGIN] User ${user.user_name} (ID: ${user.id}) logged in successfully with role: ${user.role}.`);
 
     } catch (err) {
-        sendError(res, "Login failed.", err);
+        sendError(res, "Login process failed.", err, req.path);
     }
 });
 
@@ -111,24 +133,24 @@ app.post("/api/auth/login", async (req, res) => {
 // =================================================================
 app.get("/api/admin/users", adminAuth, async (req, res) => {
     try {
-        const result = await db.query('SELECT id, user_name, role, airtable_id FROM users'); // Use 'role'
+        const result = await db.query('SELECT id, user_name, role, airtable_id FROM users');
         res.status(200).json(result.rows);
     } catch (error) {
-        sendError(res, "Failed to fetch admin users.", error);
+        sendError(res, "Failed to fetch admin users.", error, req.path);
     }
 });
 
 app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const userQuery = 'SELECT id, user_name, role, airtable_id FROM users WHERE id = $1'; // Use 'role'
+        const userQuery = 'SELECT id, user_name, role, airtable_id FROM users WHERE id = $1';
         const accountsQuery = 'SELECT * FROM accounts WHERE account_owner_id = $1 ORDER BY created_at DESC';
         const userResult = await db.query(userQuery, [id]);
         if (userResult.rows.length === 0) return res.status(404).json({ error: "User not found." });
         const accountsResult = await db.query(accountsQuery, [id]);
         res.status(200).json({ user: userResult.rows[0], accounts: accountsResult.rows });
     } catch (error) {
-        sendError(res, "Failed to fetch user details.", error);
+        sendError(res, "Failed to fetch user details.", error, req.path);
     }
 });
 
@@ -149,7 +171,7 @@ app.get("/api/admin/accounts", adminAuth, async (req, res) => {
         const result = await db.query(query, queryParams);
         res.status(200).json(result.rows);
     } catch (error) {
-        sendError(res, "Failed to fetch admin accounts.", error);
+        sendError(res, "Failed to fetch admin accounts.", error, req.path);
     }
 });
 
@@ -163,7 +185,7 @@ app.get("/api/admin/accounts/:id", adminAuth, async (req, res) => {
         const projectsResult = await db.query(projectsQuery, [id]);
         res.status(200).json({ account: accountResult.rows[0], projects: projectsResult.rows });
     } catch (error) {
-        sendError(res, "Failed to fetch account details.", error);
+        sendError(res, "Failed to fetch account details.", error, req.path);
     }
 });
 
@@ -185,7 +207,7 @@ app.get("/api/admin/projects", adminAuth, async (req, res) => {
         }
         if (status) {
             queryParams.push(status);
-            whereClaenses.push(`p.project_status = $${queryParams.length}`);
+            whereClauses.push(`p.project_status = $${queryParams.length}`);
         }
         if (ownerId) {
             queryParams.push(ownerId);
@@ -203,7 +225,7 @@ app.get("/api/admin/projects", adminAuth, async (req, res) => {
         const result = await db.query(query, queryParams);
         res.status(200).json(result.rows);
     } catch (error) {
-        sendError(res, "Failed to fetch admin projects.", error);
+        sendError(res, "Failed to fetch admin projects.", error, req.path);
     }
 });
 
@@ -224,7 +246,7 @@ app.get("/api/admin/projects/:id", adminAuth, async (req, res) => {
 
         res.status(200).json({ project: projectResult.rows[0], tasks: tasksResult.rows, updates: updatesResult.rows });
     } catch (error) {
-        sendError(res, "Failed to fetch project details.", error);
+        sendError(res, "Failed to fetch project details.", error, req.path);
     }
 });
 
@@ -246,7 +268,7 @@ app.get("/api/admin/tasks", adminAuth, async (req, res) => {
         const result = await db.query(query);
         res.status(200).json(result.rows);
     } catch (error) {
-        sendError(res, "Failed to fetch admin tasks.", error);
+        sendError(res, "Failed to fetch admin tasks.", error, req.path);
     }
 });
 
@@ -286,7 +308,7 @@ app.get("/api/admin/updates", adminAuth, async (req, res) => {
         const result = await db.query(query, queryParams);
         res.status(200).json(result.rows);
     } catch (error) {
-        sendError(res, "Failed to fetch admin updates.", error);
+        sendError(res, "Failed to fetch admin updates.", error, req.path);
     }
 });
 
@@ -300,7 +322,7 @@ app.get("/api/users", async (req, res) => {
         const { rows } = await db.query("SELECT id, airtable_id, user_name FROM users ORDER BY user_name;");
         res.json(rows);
     } catch (err) {
-        sendError(res, "Failed to fetch all users.", err);
+        sendError(res, "Failed to fetch all users.", err, req.path);
     }
 });
 
@@ -325,7 +347,7 @@ app.get("/api/accounts", async (req, res) => {
         );
         res.json(rows);
     } catch (err) {
-        sendError(res, 'Failed to fetch accounts', err);
+        sendError(res, 'Failed to fetch accounts', err, req.path);
     }
 });
 
@@ -347,7 +369,7 @@ app.get("/api/projects", async (req, res) => {
         );
         res.json(rows);
     } catch (err) {
-        sendError(res, 'Failed to fetch projects', err);
+        sendError(res, 'Failed to fetch projects', err, req.path);
     }
 });
 
@@ -378,7 +400,7 @@ app.get("/api/tasks", async (req, res) => {
         const { rows } = await db.query(query, [idArray]);
         res.json(rows);
     } catch (err) {
-        sendError(res, 'Failed to fetch tasks', err);
+        sendError(res, 'Failed to fetch tasks', err, req.path);
     }
 });
 
@@ -411,7 +433,7 @@ app.get("/api/tasks/by-creator/:creatorId", async (req, res) => {
         );
         res.json(rows);
     } catch (err) {
-        sendError(res, 'Failed to fetch tasks by creator', err);
+        sendError(res, 'Failed to fetch tasks by creator', err, req.path);
     }
 });
 
@@ -436,7 +458,7 @@ app.get("/api/updates", async (req, res) => {
         const { rows } = await db.query(query, queryParams);
         res.json(rows);
     } catch (err) {
-        sendError(res, 'Failed to fetch updates', err);
+        sendError(res, 'Failed to fetch updates', err, req.path);
     }
 });
 
@@ -451,7 +473,7 @@ app.post("/api/accounts", async (req, res) => {
             [account_name, account_type, account_description, owner_id]
         );
         res.status(201).json(rows[0]);
-    } catch (err) { sendError(res, 'Failed to create account.', err); }
+    } catch (err) { sendError(res, 'Failed to create account.', err, req.path); }
 });
 
 app.post("/api/projects", async (req, res) => {
@@ -466,7 +488,7 @@ app.post("/api/projects", async (req, res) => {
             [name, status, start_date, end_date, account_id, value || null, description, owner_id]
         );
         res.status(201).json(rows[0]);
-    } catch (err) { sendError(res, 'Failed to create project.', err); }
+    } catch (err) { sendError(res, 'Failed to create project.', err, req.path); }
 });
 
 app.post("/api/tasks", async (req, res) => {
@@ -485,7 +507,7 @@ app.post("/api/tasks", async (req, res) => {
         );
         res.status(201).json(rows[0]);
     } catch (err) { 
-        sendError(res, 'Failed to create task.', err); 
+        sendError(res, 'Failed to create task.', err, req.path); 
     }
 });
 
@@ -510,7 +532,7 @@ app.post("/api/updates", async (req, res) => {
         );
         res.status(201).json(rows[0]);
     } catch (err) {
-        sendError(res, 'Failed to create update.', err);
+        sendError(res, 'Failed to create update.', err, req.path);
     }
 });
 
@@ -535,7 +557,7 @@ app.patch("/api/projects/:id", async (req, res) => {
         }
         res.json(rows[0]);
     } catch (err) {
-        sendError(res, "Failed to update project.", err);
+        sendError(res, "Failed to update project.", err, req.path);
     }
 });
 
@@ -551,7 +573,7 @@ app.patch("/api/tasks/:id", async (req, res) => {
             [value, id]
         );
         res.json(rows[0]);
-    } catch (err) { sendError(res, "Failed to update task.", err); }
+    } catch (err) { sendError(res, "Failed to update task.", err, req.path); }
 });
 
 // =================================================================
@@ -659,7 +681,7 @@ app.post("/api/delivery-status", salesExecutiveAuth, async (req, res) => {
         const { rows } = await db.query(query, values);
         res.status(201).json(rows[0]);
     } catch (err) {
-        sendError(res, 'Failed to create project delivery status.', err);
+        sendError(res, 'Failed to create project delivery status.', err, req.path);
     }
 });
 
@@ -719,7 +741,7 @@ app.put("/api/delivery-status/:id", salesExecutiveAuth, async (req, res) => {
         }
         res.status(200).json(rows[0]);
     } catch (err) {
-        sendError(res, 'Failed to update project delivery status.', err);
+        sendError(res, 'Failed to update project delivery status.', err, req.path);
     }
 });
 
@@ -753,7 +775,7 @@ app.get("/api/delivery-status/my", salesExecutiveAuth, async (req, res) => {
         const { rows } = await db.query(query, queryParams);
         res.status(200).json(rows);
     } catch (error) {
-        sendError(res, "Failed to fetch user's project delivery statuses.", error);
+        sendError(res, "Failed to fetch user's project delivery statuses.", error, req.path);
     }
 });
 
@@ -794,7 +816,7 @@ app.get("/api/delivery-head/delivery-status", deliveryHeadAuth, async (req, res)
         const { rows } = await db.query(query, queryParams);
         res.status(200).json(rows);
     } catch (error) {
-        sendError(res, "Failed to fetch all project delivery statuses for delivery head.", error);
+        sendError(res, "Failed to fetch all project delivery statuses for delivery head.", error, req.path);
     }
 });
 
@@ -814,7 +836,7 @@ app.get("/api/delivery-head/delivery-status/:id", deliveryHeadAuth, async (req, 
         }
         res.status(200).json(rows[0]);
     } catch (error) {
-        sendError(res, "Failed to fetch project delivery status details for delivery head.", error);
+        sendError(res, "Failed to fetch project delivery status details for delivery head.", error, req.path);
     }
 });
 

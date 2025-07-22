@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import ShineBorder from "../components/ui/ShineBorder"; // Assuming this path is correct
+import ShineBorder from "../components/ui/ShineBorder"; // Restored original import path
 
 export default function Login() {
   const [secretKey, setSecretKey] = useState("");
@@ -29,7 +29,7 @@ export default function Login() {
         // Store user data in local storage
         localStorage.setItem("secretKey", secretKey);
         localStorage.setItem("userName", data.user.user_name);
-        localStorage.setItem("userRole", data.user.role); // Store the explicit role
+        localStorage.setItem("userRole", data.user.role); // Store the explicit role from backend
         localStorage.setItem("userId", data.user.id); // Store the internal database ID
 
         // Store IDs for accounts, projects, tasks, updates, and delivery statuses
@@ -45,9 +45,8 @@ export default function Login() {
           navigate("/admin/dashboard");
         } else if (data.user.role === "delivery_head") {
           navigate("/delivery-head/dashboard");
-        }
-        else {
-          navigate("/home"); // Default for sales_executive
+        } else {
+          navigate("/home"); // Default for sales_executive and any other roles
         }
       } else {
         setError(data.error || "Login failed. Please check your secret key.");
