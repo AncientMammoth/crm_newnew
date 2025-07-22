@@ -1,142 +1,113 @@
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import React, { useState, useRef, useEffect } from "react"; // Imported useEffect
-import { fetchUserBySecretKey } from "../api"; 
-import Navbar from "../components/layout/Navbar";
-import Footer from "../components/layout/Footer";
-import { motion } from 'framer-motion';
-import { LockClosedIcon } from '@heroicons/react/24/outline';
+import { motion } from "framer-motion";
+import ShineBorder from "../components/ui/ShineBorder"; // Assuming this path is correct
 
 export default function Login() {
-  const navigate = useNavigate();
-  const { register, setValue, formState: { errors } } = useForm();
-  const [loginError, setLoginError] = useState("");
+  const [secretKey, setSecretKey] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef();
+  const navigate = useNavigate();
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  const handleInputChange = async (e) => {
-    const value = e.target.value.replace(/\D/g, "");
-    setValue("secretKey", value);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ secretKey }),
+      });
 
-    if (value.length === 6) {
-      setLoginError("");
-      setLoading(true);
-      try {
-        const user = await fetchUserBySecretKey(value);
+      const data = await response.json();
 
-        if (!user || !user.user_type) {
-          setLoginError("Invalid secret key or user data not found.");
-          setValue("secretKey", "");
-          if(inputRef.current) {
-            inputRef.current.value = "";
-          }
-          setLoading(false);
-          return;
-        }
+      if (response.ok) {
+        // Store user data in local storage
+        localStorage.setItem("secretKey", secretKey);
+        localStorage.setItem("userName", data.user.user_name);
+        localStorage.setItem("userRole", data.user.role); // Store the explicit role
+        localStorage.setItem("userId", data.user.id); // Store the internal database ID
 
-        localStorage.clear();
-        localStorage.setItem("userName", user.fields["User Name"] || "User");
-        localStorage.setItem("secretKey", value);
-        localStorage.setItem("userRecordId", user.id);
-        localStorage.setItem("accountIds", JSON.stringify(user.fields.Accounts || []));
-        localStorage.setItem("projectIds", JSON.stringify(user.fields.Projects || []));
-        localStorage.setItem("updateIds", JSON.stringify(user.fields.Updates || []));
-        localStorage.setItem("taskIds", JSON.stringify(user.fields["Tasks (Assigned To)"] || []));
-        localStorage.setItem("createdTaskIds", JSON.stringify(user.fields["Tasks (Created By)"] || []));
-        
-        setLoading(false);
+        // Store IDs for accounts, projects, tasks, updates, and delivery statuses
+        localStorage.setItem("accountIds", JSON.stringify(data.accounts.map(acc => acc.id)));
+        localStorage.setItem("projectIds", JSON.stringify(data.projects.map(proj => proj.id)));
+        localStorage.setItem("taskIdsAssigned", JSON.stringify(data.tasks_assigned_to.map(task => task.id)));
+        localStorage.setItem("taskIdsCreated", JSON.stringify(data.tasks_created_by.map(task => task.id)));
+        localStorage.setItem("updateIds", JSON.stringify(data.updates.map(update => update.id)));
+        localStorage.setItem("deliveryStatusIds", JSON.stringify(data.delivery_statuses.map(ds => ds.id))); // Store new delivery status IDs
 
-        if (user.user_type === 'admin') {
-          localStorage.setItem("isAdmin", "true");
+        // Redirect based on role
+        if (data.user.role === "admin") {
           navigate("/admin/dashboard");
-        } else {
-          localStorage.setItem("isAdmin", "false");
-          navigate("/");
+        } else if (data.user.role === "delivery_head") {
+          navigate("/delivery-head/dashboard");
         }
-
-      } catch (err) {
-        console.error("Authentication failed:", err);
-        setLoginError("Authentication failed. Please check your key and try again.");
-        setValue("secretKey", "");
-        if(inputRef.current) {
-            inputRef.current.value = "";
+        else {
+          navigate("/home"); // Default for sales_executive
         }
-        setLoading(false);
+      } else {
+        setError(data.error || "Login failed. Please check your secret key.");
       }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Network error or server unreachable. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <>
-      <Navbar />
-      <div className="min-h-[80vh] flex items-center justify-center bg-card px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="max-w-md w-full space-y-8 p-10 bg-[#333333] rounded-2xl border border-border"
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <motion.div
+        initial={{ opacity: 0, y: -50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        <ShineBorder
+          className="relative flex flex-col items-center justify-center overflow-hidden rounded-lg border border-border bg-card p-8 shadow-lg"
+          color={["#A07CFE", "#FE8FB5", "#FFBE7B"]}
         >
-          <div className="flex flex-col items-center space-y-4">
-            <div className="p-3 bg-secondary rounded-full border border-border">
-                <LockClosedIcon className="h-8 w-8 text-foreground" />
-            </div>
-            <h2 className="text-4xl font-light text-center text-foreground">
-              Sign in to your account
-            </h2>
-            <p className="text-base text-muted-foreground text-center max-w-xs leading-relaxed">
-              Enter your 6-digit secret key to continue
-            </p>
-          </div>
-          <form className="space-y-6 w-full" autoComplete="off" onSubmit={e => e.preventDefault()}>
+          <h2 className="mb-6 text-center text-3xl font-light text-foreground">
+            Welcome Back!
+          </h2>
+          <form onSubmit={handleLogin} className="w-full space-y-6">
             <div>
               <label htmlFor="secretKey" className="sr-only">
                 Secret Key
               </label>
               <input
                 id="secretKey"
-                {...register("secretKey", {
-                  required: "Secret key is required",
-                  minLength: { value: 6, message: "Key must be 6 digits" },
-                  maxLength: { value: 6, message: "Key must be 6 digits" },
-                  pattern: { value: /^\d{6}$/, message: "Key must be 6 digits" },
-                })}
+                name="secretKey"
                 type="password"
-                placeholder="● ● ● ● ● ●"
-                className="block w-full rounded-md border-border bg-secondary shadow-sm focus:border-primary focus:ring-primary text-foreground placeholder:text-muted-foreground py-4 px-5 text-center tracking-[1.5em] text-2xl font-mono placeholder:tracking-normal"
-                disabled={loading}
-                autoFocus
-                maxLength={6}
-                ref={inputRef}
-                onChange={handleInputChange}
-                inputMode="numeric"
-                pattern="\d*"
-                spellCheck="false"
+                required
+                className="relative block w-full appearance-none rounded-md border border-border bg-secondary px-3 py-2 text-foreground placeholder-muted-foreground focus:z-10 focus:border-primary focus:outline-none focus:ring-primary sm:text-sm"
+                placeholder="Enter your secret key"
+                value={secretKey}
+                onChange={(e) => setSecretKey(e.target.value)}
               />
-              {errors.secretKey && (
-                <span className="text-red-500 text-sm mt-2 block text-center">{errors.secretKey.message}</span>
-              )}
+            </div>
+            {error && (
+              <p className="text-center text-sm font-medium text-red-500">
+                {error}
+              </p>
+            )}
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="group relative flex w-full justify-center rounded-md border border-transparent bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {loading ? "Logging in..." : "Login"}
+              </button>
             </div>
           </form>
-          {loginError && (
-            <div className="text-red-500 text-center text-sm font-medium">{loginError}</div>
-          )}
-          {loading && (
-            <div className="flex justify-center items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-            </div>
-          )}
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground mt-6 max-w-xs mx-auto leading-relaxed">
-              Ask your administrator for your key.
-            </p>
-            <p className="text-xs text-yellow-500/80 mt-2 font-medium max-w-xs mx-auto leading-relaxed">
-              Please <span className="underline">do not share</span> your secret key with anyone.
-            </p>
-          </div>
-        </motion.div>
-      </div>
-      <Footer />
-    </>
+        </ShineBorder>
+      </motion.div>
+    </div>
   );
 }
