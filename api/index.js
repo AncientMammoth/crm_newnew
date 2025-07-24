@@ -74,11 +74,12 @@ app.post("/api/auth/login", async (req, res) => {
         } else {
             user = userResult.rows[0];
             console.log(`[LOGIN] User found: ID: ${user.id}, Name: ${user.user_name}, Role: ${user.role}`);
-            // Ensure existing user has a role, default to sales_executive if null/empty
-            if (!user.role) {
-                console.log(`[LOGIN] User ${user.user_name} has no role. Defaulting to 'sales_executive'.`);
-                await db.query('UPDATE users SET role = $1 WHERE id = $2', ['sales_executive', user.id]);
-                user.role = 'sales_executive';
+            // Explicitly ensure existing user has a role, default to sales_executive if null/empty/undefined
+            if (!user.role || (user.role !== 'admin' && user.role !== 'delivery_head')) {
+                console.log(`[LOGIN] User ${user.user_name} has role '${user.role}'. Defaulting to 'sales_executive' for session if not admin/delivery_head.`);
+                // We don't need to update the DB here unless we want to persist this default.
+                // For session-based defaulting, just set it on the user object.
+                user.role = 'sales_executive'; 
             }
         }
 
@@ -111,7 +112,7 @@ app.post("/api/auth/login", async (req, res) => {
                 id: user.id,
                 airtable_id: user.airtable_id,
                 user_name: user.user_name,
-                role: user.role,
+                role: user.role, // This will now always be 'admin', 'delivery_head', or 'sales_executive'
             },
             accounts: accountsResult.rows,
             projects: projectsResult.rows,
@@ -245,7 +246,8 @@ app.get("/api/admin/projects/:id", adminAuth, async (req, res) => {
         ]);
 
         res.status(200).json({ project: projectResult.rows[0], tasks: tasksResult.rows, updates: updatesResult.rows });
-    } catch (error) {
+    }
+    catch (error) {
         sendError(res, "Failed to fetch project details.", error, req.path);
     }
 });
