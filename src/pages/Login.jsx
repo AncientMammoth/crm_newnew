@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import React, { useState, useRef, useEffect } from "react";
-// import { fetchUserBySecretKey } from "../api"; // No longer needed, using direct API call
+import React, { useState, useRef, useEffect } from "react"; // Imported useEffect
+import { fetchUserBySecretKey } from "../api"; // Reverted to using fetchUserBySecretKey
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import { motion } from 'framer-motion';
@@ -23,66 +23,57 @@ export default function Login() {
 
   const handleInputChange = async (e) => {
     const value = e.target.value.replace(/\D/g, "");
-    setValue("secretKey", value); // Update react-hook-form state
+    setValue("secretKey", value);
 
     if (value.length === 6) {
       setLoginError("");
       setLoading(true);
       try {
-        // Use the direct API call to your backend's login endpoint
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ secretKey: value }), // Send the current input value
-        });
+        // This call will now go through your frontend's api/index.js
+        const user = await fetchUserBySecretKey(value);
 
-        const data = await response.json();
-
-        if (response.ok) {
-          // Clear all existing local storage items before setting new ones
-          localStorage.clear();
-
-          // Store user data from the new backend response structure
-          localStorage.setItem("userName", data.user.user_name || "User");
-          localStorage.setItem("secretKey", value);
-          localStorage.setItem("userId", data.user.id); // Use 'userId' for internal DB ID
-          localStorage.setItem("userRole", data.user.role); // Store the explicit role
-
-          // Store IDs for associated entities
-          localStorage.setItem("accountIds", JSON.stringify(data.accounts.map(acc => acc.id) || []));
-          localStorage.setItem("projectIds", JSON.stringify(data.projects.map(proj => proj.id) || []));
-          localStorage.setItem("taskIdsAssigned", JSON.stringify(data.tasks_assigned_to.map(task => task.id) || []));
-          localStorage.setItem("taskIdsCreated", JSON.stringify(data.tasks_created_by.map(task => task.id) || []));
-          localStorage.setItem("updateIds", JSON.stringify(data.updates.map(update => update.id) || []));
-          localStorage.setItem("deliveryStatusIds", JSON.stringify(data.delivery_statuses.map(ds => ds.id) || []));
-
-
-          setLoading(false);
-
-          // Redirect based on the 'role' received from the backend
-          if (data.user.role === 'admin') {
-            navigate("/admin/dashboard");
-          } else if (data.user.role === 'delivery_head') {
-            navigate("/delivery-head/dashboard");
-          } else { // Default for 'sales_executive' and any other roles
-            navigate("/home");
-          }
-
-        } else {
-          setLoginError(data.error || "Login failed. Please check your secret key.");
-          setValue("secretKey", ""); // Clear input on error
+        // The 'user' object structure from fetchUserBySecretKey might differ from the direct backend response.
+        // We need to ensure it's mapped correctly based on what fetchUserBySecretKey returns.
+        // Assuming fetchUserBySecretKey now returns the new backend's 'user' object directly.
+        if (!user || !user.role) { // Changed from user_type to role
+          setLoginError("Invalid secret key or user data not found.");
+          setValue("secretKey", "");
           if(inputRef.current) {
             inputRef.current.value = "";
           }
           setLoading(false);
+          return;
+        }
+
+        localStorage.clear();
+        localStorage.setItem("userName", user.user_name || "User"); // Use user.user_name
+        localStorage.setItem("secretKey", value);
+        localStorage.setItem("userId", user.id); // Use user.id
+        localStorage.setItem("userRole", user.role); // Store the explicit role
+
+        // Assuming fetchUserBySecretKey returns these arrays directly or within a 'data' object
+        // Adjust these lines if the structure from fetchUserBySecretKey is different
+        localStorage.setItem("accountIds", JSON.stringify(user.accounts?.map(acc => acc.id) || []));
+        localStorage.setItem("projectIds", JSON.stringify(user.projects?.map(proj => proj.id) || []));
+        localStorage.setItem("taskIdsAssigned", JSON.stringify(user.tasks_assigned_to?.map(task => task.id) || []));
+        localStorage.setItem("taskIdsCreated", JSON.stringify(user.tasks_created_by?.map(task => task.id) || []));
+        localStorage.setItem("updateIds", JSON.stringify(user.updates?.map(update => update.id) || []));
+        localStorage.setItem("deliveryStatusIds", JSON.stringify(user.delivery_statuses?.map(ds => ds.id) || []));
+        
+        setLoading(false);
+
+        if (user.role === 'admin') { // Use user.role
+          navigate("/admin/dashboard");
+        } else if (user.role === 'delivery_head') { // Use user.role
+          navigate("/delivery-head/dashboard");
+        } else { // Default for 'sales_executive' and any other roles
+          navigate("/home");
         }
 
       } catch (err) {
         console.error("Authentication failed:", err);
-        setLoginError("Network error or server unreachable. Please try again.");
-        setValue("secretKey", ""); // Clear input on error
+        setLoginError("Authentication failed. Please check your key and try again.");
+        setValue("secretKey", "");
         if(inputRef.current) {
             inputRef.current.value = "";
         }

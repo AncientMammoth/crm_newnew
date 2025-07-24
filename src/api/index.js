@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // --- Axios API Client ---
 export const api = axios.create({
-  baseURL: '/api', 
+  baseURL: '/api', // This is correctly set for Vercel rewrites
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,12 +30,15 @@ async function apiRequest(path, options = {}) {
     return response.data;
   } catch (err) {
     console.error(`[App API] Error for /api/${path}:`, err);
-    throw err;
+    // Re-throw the error to be caught by the calling component
+    throw err; 
   }
 }
 
 // =================================================================
-// DATA FORMATTING HELPERS
+// DATA FORMATTING HELPERS (These are for formatting backend responses
+// to the old Airtable-like structure if needed by other parts of the frontend,
+// but the login response will be handled directly in fetchUserBySecretKey)
 // =================================================================
 
 const formatAccount = (acc) => ({
@@ -75,8 +78,8 @@ const formatTask = (task) => ({
         "Project": task.project_id ? [task.project_id] : [],
         "Project Name": task.project_name,
         "Assigned To": task.assigned_to_id ? [task.assigned_to_id] : [],
-        "Assigned To (Name)": task.assigned_to_name ? [task.assigned_to_name] : undefined, // Ensure field exists
-        "Created By (Name)": task.created_by_name ? [task.created_by_name] : undefined, // Ensure field exists
+        "Assigned To (Name)": task.assigned_to_name ? [task.assigned_to_name] : undefined,
+        "Created By (Name)": task.created_by_name ? [task.created_by_name] : undefined,
         "Updates": task.updates || [],
     }
 });
@@ -100,25 +103,29 @@ const formatUpdate = (update) => ({
 // API FUNCTIONS
 // =================================================================
 
+// MODIFIED: To correctly parse the new backend login response structure
 export async function fetchUserBySecretKey(secretKey) {
   try {
     const response = await api.post('/auth/login', { secretKey });
-    const { user, accounts, projects, tasks_assigned_to, tasks_created_by, updates } = response.data;
+    const { user, accounts, projects, tasks_assigned_to, tasks_created_by, updates, delivery_statuses } = response.data;
+    
+    // Return the data in a structure that Login.jsx expects,
+    // which is closer to the raw backend response now,
+    // but still compatible with how Login.jsx uses it.
     return {
-      id: user.airtable_id,
-      user_type: user.user_type,
-      fields: {
-        "User Name": user.user_name,
-        "Accounts": accounts.map(a => a.id),
-        "Projects": projects.map(p => p.id),
-        "Tasks (Assigned To)": tasks_assigned_to.map(t => t.id),
-        "Tasks (Created By)": tasks_created_by.map(t => t.id),
-        "Updates": updates.map(u => u.id),
-      }
+      id: user.id, // Backend now returns user.id directly
+      user_name: user.user_name, // Backend returns user.user_name
+      role: user.role, // Backend returns user.role
+      accounts: accounts, // Pass raw arrays
+      projects: projects,
+      tasks_assigned_to: tasks_assigned_to,
+      tasks_created_by: tasks_created_by,
+      updates: updates,
+      delivery_statuses: delivery_statuses, // New: Include delivery statuses
     };
   } catch (err) {
-    console.error("Authentication error in api/index.js:", err);
-    throw err;
+    console.error("Authentication error in api/index.js (fetchUserBySecretKey):", err.response?.data || err.message);
+    throw err.response?.data?.error || err.message || "Failed to authenticate.";
   }
 };
 
@@ -177,7 +184,8 @@ export async function fetchUpdatesByIds(ids = []) {
 
 export async function fetchUpdatesByProjectId(projectId) {
     if (!projectId) return [];
-    const updates = await apiRequest(`updates/by-project/${projectId}`);
+    // This endpoint might not exist in your backend, adjust if necessary
+    const updates = await apiRequest(`updates/by-project/${projectId}`); 
     return updates.map(formatUpdate);
 }
 
@@ -200,11 +208,12 @@ export const updateTask = (taskId, fields) => updateRecord("Tasks", taskId, fiel
 
 export async function fetchAllUsersForAdmin() {
     const users = await apiRequest("admin/users");
+    // Assuming backend returns 'role' now instead of 'user_type'
     return users.map(user => ({
         id: user.id,
         fields: {
             "User Name": user.user_name,
-            "User Type": user.user_type,
+            "User Type": user.role, // Map 'role' to 'User Type' for existing frontend components
             "Secret Key": user.airtable_id,
         }
     }));
@@ -248,7 +257,8 @@ export async function fetchAllUpdatesForAdmin(filters = {}) {
 export async function fetchAdminUserDetail(userId) {
   const data = await apiRequest(`admin/users/${userId}`);
   const formattedAccounts = data.accounts.map(formatAccount);
-  return { user: data.user, accounts: formattedAccounts };
+  // Assuming user object now has 'role' instead of 'user_type'
+  return { user: { ...data.user, user_type: data.user.role }, accounts: formattedAccounts };
 }
 
 export async function fetchAdminAccountDetail(accountId) {
@@ -267,7 +277,7 @@ export async function fetchAdminProjectDetail(projectId) {
 }
 
 // =================================================================
-// CLIENT-SIDE LOGIC
+// CLIENT-SIDE UTILITY LOGIC (Not direct API calls)
 // =================================================================
 
 export function formatDateForAirtable(dateInput) {
