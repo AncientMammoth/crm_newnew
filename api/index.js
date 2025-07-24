@@ -12,7 +12,10 @@ app.use(express.json());
 // Enhanced sendError to include path for better debugging in logs
 const sendError = (res, message, err, path = 'N/A') => {
   console.error(`[ERROR] Path: ${path} - ${message}`, err);
-  res.status(500).json({ error: message, details: err.message });
+  // Ensure a JSON response is always sent, even for internal errors
+  if (!res.headersSent) {
+    res.status(500).json({ error: message, details: err.message || 'Unknown error' });
+  }
 };
 
 // --- Authentication Middleware (Generic) ---
@@ -24,11 +27,12 @@ const authMiddleware = (requiredRole) => async (req, res, next) => {
     return res.status(401).json({ error: 'Unauthorized: No secret key provided.' });
   }
   try {
-    const userQuery = 'SELECT role FROM users WHERE airtable_id = $1';
+    const userQuery = 'SELECT id, role FROM users WHERE airtable_id = $1'; // Fetch user ID too
     const { rows } = await db.query(userQuery, [secretKey]);
     
     if (rows.length > 0 && rows[0].role === requiredRole) {
-      console.log(`[AUTH] Path: ${req.path} - User with role '${rows[0].role}' authorized for '${requiredRole}'.`);
+      req.user = { id: rows[0].id, role: rows[0].role }; // Attach user info to request
+      console.log(`[AUTH] Path: ${req.path} - User ID: ${req.user.id}, Role: '${req.user.role}' authorized for '${requiredRole}'.`);
       next();
     } else {
       console.log(`[AUTH] Path: ${req.path} - Forbidden: User role '${rows.length > 0 ? rows[0].role : 'N/A'}' does not match required role '${requiredRole}'.`);
@@ -84,28 +88,19 @@ app.post("/api/auth/login", async (req, res) => {
         }
 
         // Fetch associated data for the user
-        const accountsQuery = 'SELECT id FROM accounts WHERE account_owner_id = $1';
-        const projectsQuery = 'SELECT id FROM projects WHERE project_owner_id = $1';
-        const tasksAssignedQuery = 'SELECT id FROM tasks WHERE assigned_to_id = $1';
-        const tasksCreatedQuery = 'SELECT id FROM tasks WHERE created_by_id = $1';
-        const updatesQuery = 'SELECT id FROM updates WHERE update_owner_id = $1';
-        const deliveryStatusQuery = 'SELECT id FROM all_projects WHERE created_by_user_id = $1';
-
-        const [
-            accountsResult,
-            projectsResult,
-            tasksAssignedResult,
-            tasksCreatedResult,
-            updatesResult,
-            deliveryStatusResult
-        ] = await Promise.all([
-            db.query(accountsQuery, [user.id]),
-            db.query(projectsQuery, [user.id]),
-            db.query(tasksAssignedQuery, [user.id]),
-            db.query(tasksCreatedQuery, [user.id]),
-            db.query(updatesQuery, [user.id]),
-            db.query(deliveryStatusQuery, [user.id])
-        ]);
+        // Added logs for each data fetch
+        const accountsResult = await db.query(accountsQuery, [user.id]);
+        console.log(`[LOGIN] Fetched ${accountsResult.rows.length} accounts for user ID ${user.id}.`);
+        const projectsResult = await db.query(projectsQuery, [user.id]);
+        console.log(`[LOGIN] Fetched ${projectsResult.rows.length} projects for user ID ${user.id}.`);
+        const tasksAssignedResult = await db.query(tasksAssignedQuery, [user.id]);
+        console.log(`[LOGIN] Fetched ${tasksAssignedResult.rows.length} assigned tasks for user ID ${user.id}.`);
+        const tasksCreatedResult = await db.query(tasksCreatedQuery, [user.id]);
+        console.log(`[LOGIN] Fetched ${tasksCreatedResult.rows.length} created tasks for user ID ${user.id}.`);
+        const updatesResult = await db.query(updatesQuery, [user.id]);
+        console.log(`[LOGIN] Fetched ${updatesResult.rows.length} updates for user ID ${user.id}.`);
+        const deliveryStatusResult = await db.query(deliveryStatusQuery, [user.id]);
+        console.log(`[LOGIN] Fetched ${deliveryStatusResult.rows.length} delivery statuses for user ID ${user.id}.`);
 
         res.status(200).json({
             user: {
@@ -135,6 +130,7 @@ app.post("/api/auth/login", async (req, res) => {
 app.get("/api/admin/users", adminAuth, async (req, res) => {
     try {
         const result = await db.query('SELECT id, user_name, role, airtable_id FROM users');
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${result.rows.length} admin users.`);
         res.status(200).json(result.rows);
     } catch (error) {
         sendError(res, "Failed to fetch admin users.", error, req.path);
@@ -148,7 +144,9 @@ app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
         const accountsQuery = 'SELECT * FROM accounts WHERE account_owner_id = $1 ORDER BY created_at DESC';
         const userResult = await db.query(userQuery, [id]);
         if (userResult.rows.length === 0) return res.status(404).json({ error: "User not found." });
+        console.log(`[ADMIN] Path: ${req.path} - Fetched details for user ID ${id}.`);
         const accountsResult = await db.query(accountsQuery, [id]);
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${accountsResult.rows.length} accounts for user ID ${id}.`);
         res.status(200).json({ user: userResult.rows[0], accounts: accountsResult.rows });
     } catch (error) {
         sendError(res, "Failed to fetch user details.", error, req.path);
@@ -170,6 +168,7 @@ app.get("/api/admin/accounts", adminAuth, async (req, res) => {
         }
         query += " ORDER BY a.created_at DESC";
         const result = await db.query(query, queryParams);
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${result.rows.length} admin accounts.`);
         res.status(200).json(result.rows);
     } catch (error) {
         sendError(res, "Failed to fetch admin accounts.", error, req.path);
@@ -183,7 +182,9 @@ app.get("/api/admin/accounts/:id", adminAuth, async (req, res) => {
         const projectsQuery = 'SELECT p.*, u.user_name as project_owner_name FROM projects p LEFT JOIN users u ON p.project_owner_id = u.id WHERE p.account_id = $1 ORDER BY p.created_at DESC';
         const accountResult = await db.query(accountQuery, [id]);
         if (accountResult.rows.length === 0) return res.status(404).json({ error: "Account not found." });
+        console.log(`[ADMIN] Path: ${req.path} - Fetched details for account ID ${id}.`);
         const projectsResult = await db.query(projectsQuery, [id]);
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${projectsResult.rows.length} projects for account ID ${id}.`);
         res.status(200).json({ account: accountResult.rows[0], projects: projectsResult.rows });
     } catch (error) {
         sendError(res, "Failed to fetch account details.", error, req.path);
@@ -224,6 +225,7 @@ app.get("/api/admin/projects", adminAuth, async (req, res) => {
         query += " ORDER BY p.created_at DESC";
 
         const result = await db.query(query, queryParams);
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${result.rows.length} admin projects.`);
         res.status(200).json(result.rows);
     } catch (error) {
         sendError(res, "Failed to fetch admin projects.", error, req.path);
@@ -239,11 +241,13 @@ app.get("/api/admin/projects/:id", adminAuth, async (req, res) => {
 
         const projectResult = await db.query(projectQuery, [id]);
         if (projectResult.rows.length === 0) return res.status(404).json({ error: "Project not found." });
+        console.log(`[ADMIN] Path: ${req.path} - Fetched details for project ID ${id}.`);
 
         const [tasksResult, updatesResult] = await Promise.all([
             db.query(tasksQuery, [id]),
             db.query(updatesQuery, [id])
         ]);
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${tasksResult.rows.length} tasks and ${updatesResult.rows.length} updates for project ID ${id}.`);
 
         res.status(200).json({ project: projectResult.rows[0], tasks: tasksResult.rows, updates: updatesResult.rows });
     }
@@ -268,6 +272,7 @@ app.get("/api/admin/tasks", adminAuth, async (req, res) => {
             ORDER BY t.created_at DESC
         `;
         const result = await db.query(query);
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${result.rows.length} admin tasks.`);
         res.status(200).json(result.rows);
     } catch (error) {
         sendError(res, "Failed to fetch admin tasks.", error, req.path);
@@ -308,6 +313,7 @@ app.get("/api/admin/updates", adminAuth, async (req, res) => {
         query += " ORDER BY u.date DESC, u.created_at DESC";
         
         const result = await db.query(query, queryParams);
+        console.log(`[ADMIN] Path: ${req.path} - Fetched ${result.rows.length} admin updates.`);
         res.status(200).json(result.rows);
     } catch (error) {
         sendError(res, "Failed to fetch admin updates.", error, req.path);
@@ -322,6 +328,7 @@ app.get("/api/admin/updates", adminAuth, async (req, res) => {
 app.get("/api/users", async (req, res) => {
     try {
         const { rows } = await db.query("SELECT id, airtable_id, user_name FROM users ORDER BY user_name;");
+        console.log(`[SALES_EXEC] Path: ${req.path} - Fetched ${rows.length} users.`);
         res.json(rows);
     } catch (err) {
         sendError(res, "Failed to fetch all users.", err, req.path);
@@ -347,6 +354,7 @@ app.get("/api/accounts", async (req, res) => {
              ) p ON p.account_id = a.id
              WHERE a.id = ANY($1::integer[])`, [idArray]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Fetched ${rows.length} accounts for IDs: ${ids}.`);
         res.json(rows);
     } catch (err) {
         sendError(res, 'Failed to fetch accounts', err, req.path);
@@ -369,6 +377,7 @@ app.get("/api/projects", async (req, res) => {
              ) upd ON upd.project_id = p.id
              WHERE p.id = ANY($1::integer[])`, [idArray]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Fetched ${rows.length} projects for IDs: ${ids}.`);
         res.json(rows);
     } catch (err) {
         sendError(res, 'Failed to fetch projects', err, req.path);
@@ -400,6 +409,7 @@ app.get("/api/tasks", async (req, res) => {
         `;
         
         const { rows } = await db.query(query, [idArray]);
+        console.log(`[SALES_EXEC] Path: ${req.path} - Fetched ${rows.length} tasks for IDs: ${ids}.`);
         res.json(rows);
     } catch (err) {
         sendError(res, 'Failed to fetch tasks', err, req.path);
@@ -433,6 +443,7 @@ app.get("/api/tasks/by-creator/:creatorId", async (req, res) => {
              ORDER BY t.created_at DESC`, 
             [internalCreatorId]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Fetched ${rows.length} tasks by creator ID: ${creatorId}.`);
         res.json(rows);
     } catch (err) {
         sendError(res, 'Failed to fetch tasks by creator', err, req.path);
@@ -458,6 +469,7 @@ app.get("/api/updates", async (req, res) => {
         }
         query += ` ORDER BY u.date DESC, u.created_at DESC`;
         const { rows } = await db.query(query, queryParams);
+        console.log(`[SALES_EXEC] Path: ${req.path} - Fetched ${rows.length} updates for IDs: ${ids}.`);
         res.json(rows);
     } catch (err) {
         sendError(res, 'Failed to fetch updates', err, req.path);
@@ -474,6 +486,7 @@ app.post("/api/accounts", async (req, res) => {
             `INSERT INTO accounts (account_name, account_type, account_description, account_owner_id) VALUES ($1, $2, $3, $4) RETURNING *`,
             [account_name, account_type, account_description, owner_id]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Created account ID: ${rows[0].id}.`);
         res.status(201).json(rows[0]);
     } catch (err) { sendError(res, 'Failed to create account.', err, req.path); }
 });
@@ -489,6 +502,7 @@ app.post("/api/projects", async (req, res) => {
             `INSERT INTO projects (project_name, project_status, start_date, end_date, account_id, project_value, project_description, project_owner_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
             [name, status, start_date, end_date, account_id, value || null, description, owner_id]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Created project ID: ${rows[0].id}.`);
         res.status(201).json(rows[0]);
     } catch (err) { sendError(res, 'Failed to create project.', err, req.path); }
 });
@@ -507,6 +521,7 @@ app.post("/api/tasks", async (req, res) => {
             `INSERT INTO tasks (task_name, project_id, assigned_to_id, due_date, status, description, created_by_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
             [name, project_id, assigned_to_id, due_date, status, description, created_by_id]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Created task ID: ${rows[0].id}.`);
         res.status(201).json(rows[0]);
     } catch (err) { 
         sendError(res, 'Failed to create task.', err, req.path); 
@@ -532,6 +547,7 @@ app.post("/api/updates", async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
             [notes, date, update_type, project_id, task_id || null, owner_id, project_name, update_owner_name, update_account]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Created update ID: ${rows[0].id}.`);
         res.status(201).json(rows[0]);
     } catch (err) {
         sendError(res, 'Failed to create update.', err, req.path);
@@ -554,6 +570,7 @@ app.patch("/api/projects/:id", async (req, res) => {
             `UPDATE projects SET ${setClauses} WHERE id = $${values.length + 1} RETURNING *`,
             [...values, id]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Updated project ID: ${rows[0].id}.`);
         if (rows.length === 0) {
             return res.status(404).json({ error: "Project not found or no update was made." });
         }
@@ -574,6 +591,7 @@ app.patch("/api/tasks/:id", async (req, res) => {
             `UPDATE tasks SET ${dbColumn} = $1 WHERE id = $2 RETURNING *`,
             [value, id]
         );
+        console.log(`[SALES_EXEC] Path: ${req.path} - Updated task ID: ${rows[0].id}.`);
         res.json(rows[0]);
     } catch (err) { sendError(res, "Failed to update task.", err, req.path); }
 });
@@ -681,6 +699,7 @@ app.post("/api/delivery-status", salesExecutiveAuth, async (req, res) => {
         ];
 
         const { rows } = await db.query(query, values);
+        console.log(`[SALES_EXEC] Path: ${req.path} - Created delivery status ID: ${rows[0].id}.`);
         res.status(201).json(rows[0]);
     } catch (err) {
         sendError(res, 'Failed to create project delivery status.', err, req.path);
@@ -738,6 +757,7 @@ app.put("/api/delivery-status/:id", salesExecutiveAuth, async (req, res) => {
         const query = `UPDATE all_projects SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *;`;
 
         const { rows } = await db.query(query, values);
+        console.log(`[SALES_EXEC] Path: ${req.path} - Updated delivery status ID: ${rows[0].id}.`);
         if (rows.length === 0) {
             return res.status(404).json({ error: "Delivery status not found or no update was made." });
         }
@@ -775,6 +795,7 @@ app.get("/api/delivery-status/my", salesExecutiveAuth, async (req, res) => {
         query += ` ORDER BY ap.created_at DESC;`;
 
         const { rows } = await db.query(query, queryParams);
+        console.log(`[SALES_EXEC] Path: ${req.path} - Fetched ${rows.length} user-specific delivery statuses.`);
         res.status(200).json(rows);
     } catch (error) {
         sendError(res, "Failed to fetch user's project delivery statuses.", error, req.path);
@@ -816,6 +837,7 @@ app.get("/api/delivery-head/delivery-status", deliveryHeadAuth, async (req, res)
         query += " ORDER BY ap.created_at DESC;";
 
         const { rows } = await db.query(query, queryParams);
+        console.log(`[DELIVERY_HEAD] Path: ${req.path} - Fetched ${rows.length} all delivery statuses.`);
         res.status(200).json(rows);
     } catch (error) {
         sendError(res, "Failed to fetch all project delivery statuses for delivery head.", error, req.path);
@@ -833,6 +855,7 @@ app.get("/api/delivery-head/delivery-status/:id", deliveryHeadAuth, async (req, 
             WHERE ap.id = $1;
         `;
         const { rows } = await db.query(query, [id]);
+        console.log(`[DELIVERY_HEAD] Path: ${req.path} - Fetched details for delivery status ID: ${id}.`);
         if (rows.length === 0) {
             return res.status(404).json({ error: "Project delivery status not found." });
         }
