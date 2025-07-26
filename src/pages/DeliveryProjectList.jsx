@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
+import { api } from '../api'; // Import the axios instance
 
 // Helper function for class names
 function cn(...inputs) {
@@ -12,20 +13,20 @@ function cn(...inputs) {
 
 // API call to fetch all project delivery statuses for delivery head
 const fetchAllDeliveryStatuses = async () => {
+  // The secretKey is already handled by the axios interceptor in api/index.js
   const secretKey = localStorage.getItem('secretKey');
   if (!secretKey) {
     throw new Error('Secret key not found. Please log in.');
   }
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/delivery-head/delivery-status`, {
-    headers: {
-      'x-secret-key': secretKey,
-    },
-  });
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to fetch project delivery statuses.');
+
+  try {
+    // Use the 'api' axios instance for the request
+    const response = await api.get('/delivery-head/delivery-status'); // Relative path is handled by axios baseURL
+    return response.data; // Axios returns data directly in response.data
+  } catch (error) {
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch project delivery statuses.';
+    throw new Error(errorMessage);
   }
-  return response.json();
 };
 
 export default function DeliveryProjectList() {

@@ -3,23 +3,27 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { api } from '../api'; // Import the axios instance
 
 // API call to fetch project delivery statuses for the current sales executive
 const fetchMyDeliveryStatuses = async () => {
+  // The secretKey is already handled by the axios interceptor in api/index.js
+  // We just need to ensure it's present in localStorage for the interceptor to pick it up.
   const secretKey = localStorage.getItem('secretKey');
   if (!secretKey) {
+    // This check is still good to have for immediate feedback if key is missing
     throw new Error('Secret key not found. Please log in.');
   }
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/delivery-status/my`, {
-    headers: {
-      'x-secret-key': secretKey,
-    },
-  });
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to fetch your project delivery statuses.');
+
+  try {
+    // Use the 'api' axios instance for the request
+    const response = await api.get('/delivery-status/my'); // Relative path is handled by axios baseURL
+    return response.data; // Axios returns data directly in response.data
+  } catch (error) {
+    // Axios errors have a different structure
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch your project delivery statuses.';
+    throw new Error(errorMessage);
   }
-  return response.json();
 };
 
 // Helper to format date
