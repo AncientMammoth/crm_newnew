@@ -8,6 +8,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- SQL Query Definitions (FIX: Added these missing query definitions) ---
+const accountsQuery = 'SELECT id FROM accounts WHERE account_owner_id = $1';
+const projectsQuery = 'SELECT id FROM projects WHERE project_owner_id = $1';
+const tasksAssignedQuery = 'SELECT id FROM tasks WHERE assigned_to_id = $1';
+const tasksCreatedQuery = 'SELECT id FROM tasks WHERE created_by_id = $1';
+const updatesQuery = 'SELECT id FROM updates WHERE update_owner_id = $1';
+const deliveryStatusQuery = 'SELECT id FROM all_projects WHERE created_by_user_id = $1';
+
+
 // --- Helper Functions ---
 // Enhanced sendError to include path for better debugging in logs
 const sendError = (res, message, err, path = 'N/A') => {
