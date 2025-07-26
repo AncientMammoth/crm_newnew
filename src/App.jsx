@@ -1,156 +1,146 @@
-import { Routes, Route, Navigate } from "react-router-dom";
-import React from "react";
-
-// Page & Component Imports
-import Login from "./pages/Login";
-import DashboardLayout from "./components/layout/DashboardLayout";
-import Home from "./pages/Home";
-import Accounts from "./pages/Accounts";
-import AccountDetail from "./pages/AccountDetail";
-import Projects from "./pages/Projects";
-import ProjectDetail from "./pages/ProjectDetail";
-import Updates from "./pages/Updates";
-import UpdateDetail from "./pages/UpdateDetail";
-import AccountCreation from "./pages/AccountCreation";
-import ProjectCreation from "./pages/ProjectCreation";
-import UpdateCreation from "./pages/UpdateCreation";
-import TasksRouter from "./pages/TasksRouter";
-import CreateTask from "./pages/CreateTask";
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Home from './pages/Home';
+import Accounts from './pages/Accounts';
+import AccountDetail from './pages/AccountDetail';
+import AccountCreation from './pages/AccountCreation';
+import Projects from './pages/Projects';
+import ProjectDetail from './pages/ProjectDetail';
+import ProjectCreation from './pages/ProjectCreation';
+import Updates from './pages/Updates';
+import UpdateDetail from './pages/UpdateDetail';
+import UpdateCreation from './pages/UpdateCreation';
 import Tasks from './pages/Tasks';
 import TaskDetail from './pages/TaskDetail';
-
-// Admin Component Imports
-import AdminLayout from './components/layout/AdminLayout';
+import CreateTask from './pages/CreateTask';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUserList from './pages/AdminUserList';
-import AdminProjectList from './pages/AdminProjectList';
-import AdminTaskList from './pages/AdminTaskList';
-import AdminAccountList from './pages/AdminAccountList';
-import AdminUpdateList from './pages/AdminUpdateList';
 import AdminUserDetail from './pages/AdminUserDetail';
+import AdminAccountList from './pages/AdminAccountList';
 import AdminAccountDetail from './pages/AdminAccountDetail';
+import AdminProjectList from './pages/AdminProjectList';
 import AdminProjectDetail from './pages/AdminProjectDetail';
-import AdminCreateTask from './pages/AdminCreateTask';
-import AdminMyTasks from './pages/AdminMyTasks';
+import AdminTaskList from './pages/AdminTaskList';
 import AdminTaskDetail from './pages/AdminTaskDetail';
-
-// New Delivery Head Component Imports
-import DeliveryHeadLayout from './components/layout/DeliveryHeadLayout';
+import AdminUpdateList from './pages/AdminUpdateList';
 import DeliveryHeadDashboard from './pages/DeliveryHeadDashboard';
 import DeliveryProjectList from './pages/DeliveryProjectList';
 import DeliveryProjectDetail from './pages/DeliveryProjectDetail';
+import MyProjectDeliveries from './pages/MyProjectDeliveries'; // Import the new component
+import ProjectDeliveryForm from './pages/ProjectDeliveryForm'; // Import the new component
 
-// New Sales Executive Delivery Pages
-import ProjectDeliveryForm from './pages/ProjectDeliveryForm';
-import MyProjectDeliveries from './pages/MyProjectDeliveries';
+import DashboardLayout from './components/layout/DashboardLayout';
+import AdminLayout from './components/layout/AdminLayout';
+import DeliveryHeadLayout from './components/layout/DeliveryHeadLayout';
 
+import './App.css';
 
-// Route Guards and Redirects
-function PrivateRoute({ children, allowedRoles }) {
-  const secretKey = localStorage.getItem("secretKey");
-  const userRole = localStorage.getItem("userRole"); // Get user role from local storage
+function App() {
+  const [userRole, setUserRole] = useState(localStorage.getItem('userRole'));
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('secretKey'));
 
-  if (!secretKey) {
-    return <Navigate to="/login" />;
-  }
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setUserRole(localStorage.getItem('userRole'));
+      setIsLoggedIn(!!localStorage.getItem('secretKey'));
+    };
 
-  // Check if the user's role is allowed for this route
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
-    // If not allowed, redirect to home or login based on whether they are logged in
-    return <Navigate to={userRole === 'admin' ? '/admin/dashboard' : userRole === 'delivery_head' ? '/delivery-head/dashboard' : '/home'} />;
-  }
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
-  return children;
-}
-
-function HomeRedirect() {
-    const userRole = localStorage.getItem("userRole");
-    const secretKey = localStorage.getItem("secretKey");
-
-    if (secretKey) {
-        if (userRole === "admin") {
-            return <Navigate to="/admin/dashboard" />;
-        } else if (userRole === "delivery_head") {
-            return <Navigate to="/delivery-head/dashboard" />;
-        } else {
-            return <Navigate to="/home" />; // Default for sales_executive
-        }
+  // PrivateRoute component to protect routes based on authentication and role
+  const PrivateRoute = ({ children, roles }) => {
+    if (!isLoggedIn) {
+      return <Navigate to="/login" replace />;
     }
-    
-    return <Navigate to="/login" />;
-}
+    if (roles && !roles.includes(userRole)) {
+      // Redirect to a forbidden page or home if role doesn't match
+      return <Navigate to="/home" replace />; 
+    }
+    return children;
+  };
 
-export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<HomeRedirect />} />
+    <Router>
+      <Routes>
+        {/* Public Route */}
+        <Route path="/login" element={<Login />} />
 
-      {/* Standard User (Sales Executive) Routes */}
-      <Route
-        path="/"
-        element={
-          <PrivateRoute allowedRoles={['sales_executive']}>
-            <DashboardLayout />
-          </PrivateRoute>
-        }
-      >
-        <Route path="home" element={<Home />} />
-        <Route path="accounts" element={<Accounts />} /> 
-        <Route path="accounts/:id" element={<AccountDetail />} />
-        <Route path="projects" element={<Projects />} />
-        <Route path="projects/:id" element={<ProjectDetail />} />
-        <Route path="updates" element={<Updates />} />
-        <Route path="updates/:id" element={<UpdateDetail />} />
-        <Route path="create-account" element={<AccountCreation />} />
-        <Route path="create-project" element={<ProjectCreation />} />
-        <Route path="create-update" element={<UpdateCreation />} />
-        <Route path="tasks" element={<TasksRouter />} />
-        <Route path="create-task" element={<CreateTask />} />
-        <Route path="my-tasks" element={<Tasks />} />
-        <Route path="tasks/:taskId" element={<TaskDetail />} />
-        {/* New Delivery Status Routes for Sales Executive */}
-        <Route path="delivery" element={<MyProjectDeliveries />} /> {/* List of their own deliveries */}
-        <Route path="delivery/create" element={<ProjectDeliveryForm />} /> {/* Form to create/edit */}
-        <Route path="delivery/edit/:id" element={<ProjectDeliveryForm />} /> {/* Edit existing delivery status */}
-      </Route>
+        {/* Sales Executive Routes */}
+        <Route 
+          path="/" 
+          element={
+            <PrivateRoute roles={['sales_executive']}>
+              <DashboardLayout />
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Home />} />
+          <Route path="home" element={<Home />} />
+          <Route path="accounts" element={<Accounts />} />
+          <Route path="accounts/:id" element={<AccountDetail />} />
+          <Route path="create-account" element={<AccountCreation />} />
+          <Route path="projects" element={<Projects />} />
+          <Route path="projects/:id" element={<ProjectDetail />} />
+          <Route path="create-project" element={<ProjectCreation />} />
+          <Route path="updates" element={<Updates />} />
+          <Route path="updates/:id" element={<UpdateDetail />} />
+          <Route path="create-update" element={<UpdateCreation />} />
+          <Route path="tasks" element={<Tasks />} />
+          <Route path="tasks/:id" element={<TaskDetail />} />
+          <Route path="create-task" element={<CreateTask />} />
+          {/* FIX: Add route for MyProjectDeliveries */}
+          <Route path="my-project-deliveries" element={<MyProjectDeliveries />} />
+          {/* FIX: Add route for ProjectDeliveryForm */}
+          <Route path="create-delivery-status" element={<ProjectDeliveryForm />} />
+        </Route>
 
-      {/* Admin Routes */}
-      <Route
-        path="/admin"
-        element={
-          <PrivateRoute allowedRoles={['admin']}>
-            <AdminLayout />
-          </PrivateRoute>
-        }
-      >
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="users" element={<AdminUserList />} />
-        <Route path="users/:id" element={<AdminUserDetail />} />
-        <Route path="accounts" element={<AdminAccountList />} />
-        <Route path="accounts/:id" element={<AdminAccountDetail />} />
-        <Route path="projects" element={<AdminProjectList />} />
-        <Route path="projects/:id" element={<AdminProjectDetail />} />
-        <Route path="tasks" element={<AdminTaskList />} />
-        <Route path="tasks/:taskId" element={<AdminTaskDetail />} />
-        <Route path="my-tasks" element={<AdminMyTasks />} />
-        <Route path="create-task" element={<AdminCreateTask />} />
-        <Route path="updates" element={<AdminUpdateList />} />
-      </Route>
+        {/* Admin Routes */}
+        <Route 
+          path="/admin" 
+          element={
+            <PrivateRoute roles={['admin']}>
+              <AdminLayout />
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUserList />} />
+          <Route path="users/:id" element={<AdminUserDetail />} />
+          <Route path="accounts" element={<AdminAccountList />} />
+          <Route path="accounts/:id" element={<AdminAccountDetail />} />
+          <Route path="projects" element={<AdminProjectList />} />
+          <Route path="projects/:id" element={<AdminProjectDetail />} />
+          <Route path="tasks" element={<AdminTaskList />} />
+          <Route path="tasks/:id" element={<AdminTaskDetail />} />
+          <Route path="updates" element={<AdminUpdateList />} />
+        </Route>
 
-      {/* Delivery Head Routes */}
-      <Route
-        path="/delivery-head"
-        element={
-          <PrivateRoute allowedRoles={['delivery_head']}>
-            <DeliveryHeadLayout />
-          </PrivateRoute>
-        }
-      >
-        <Route path="dashboard" element={<DeliveryHeadDashboard />} />
-        <Route path="projects" element={<DeliveryProjectList />} />
-        <Route path="projects/:id" element={<DeliveryProjectDetail />} />
-      </Route>
-    </Routes>
+        {/* Delivery Head Routes */}
+        <Route 
+          path="/delivery-head" 
+          element={
+            <PrivateRoute roles={['delivery_head']}>
+              <DeliveryHeadLayout />
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<DeliveryHeadDashboard />} />
+          <Route path="dashboard" element={<DeliveryHeadDashboard />} />
+          <Route path="project-deliveries" element={<DeliveryProjectList />} />
+          <Route path="project-deliveries/:id" element={<DeliveryProjectDetail />} />
+        </Route>
+
+        {/* Catch-all for unmatched routes - redirect to login or home */}
+        <Route path="*" element={<Navigate to={isLoggedIn ? "/home" : "/login"} replace />} />
+      </Routes>
+    </Router>
   );
 }
+
+export default App;
