@@ -32,7 +32,7 @@ const fetchDeliveryStatusForEdit = async (id) => {
     throw new Error('Delivery status not found.');
   } catch (error) {
     const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch delivery status for edit.';
-    throw new Error(errorMessage);
+    throw new new Error(errorMessage);
   }
 };
 
@@ -268,9 +268,9 @@ export default function ProjectDeliveryForm() {
                 required
                 className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               >
-                <option value="">Select a Project</option>
+                <option value="" className="bg-input text-foreground">Select a Project</option>
                 {projects?.map((project) => (
-                  <option key={project.id} value={project.id}>
+                  <option key={project.id} value={project.id} className="bg-input text-foreground">
                     {project.project_name} (ID: {project.id})
                   </option>
                 ))}
@@ -291,7 +291,7 @@ export default function ProjectDeliveryForm() {
                 className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               >
                 {projectTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
+                  <option key={option.value} value={option.value} className="bg-input text-foreground">
                     {option.label}
                   </option>
                 ))}
@@ -394,7 +394,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -410,7 +412,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -426,7 +430,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -442,7 +448,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -458,7 +466,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -474,7 +484,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -503,7 +515,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -577,7 +591,9 @@ export default function ProjectDeliveryForm() {
                     className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   >
                     {booleanOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option} className="bg-input text-foreground">
+                        {option}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -625,7 +641,9 @@ export default function ProjectDeliveryForm() {
                 className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               >
                 {booleanOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option} value={option} className="bg-input text-foreground">
+                    {option}
+                  </option>
                 ))}
               </select>
             </div>
