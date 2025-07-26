@@ -32,12 +32,11 @@ export default function Navbar({ setSidebarOpen }) {
 
   // Navigation items for sales executives
   const salesExecutiveNavigation = [
-    { name: 'Home', href: '/home' },
+    { name: 'Home', href: '/home' }, // Changed to /home for consistency
     { name: 'Accounts', href: '/accounts' },
     { name: 'Projects', href: '/projects' },
     { name: 'Updates', href: '/updates' },
-    // FIX: Changed 'Delivery' href to a client-side route that maps to MyProjectDeliveries.jsx
-    { name: 'Delivery', href: '/my-project-deliveries' }, 
+    { name: 'Delivery', href: '/delivery' }, // New Delivery link
   ];
 
   const tasksNavigation = [
@@ -51,8 +50,7 @@ export default function Navbar({ setSidebarOpen }) {
     { name: 'New Project', href: '/create-project' },
     { name: 'New Update', href: '/create-update' },
     { name: 'New Task', href: '/create-task' },
-    // FIX: Changed 'New Delivery Status' href to a client-side route that maps to ProjectDeliveryForm.jsx
-    { name: 'New Delivery Status', href: '/create-delivery-status' }, 
+    { name: 'New Delivery Status', href: '/delivery/create' }, // New Quick Create for Delivery Status
   ];
 
   const userNavigation = [
@@ -61,9 +59,8 @@ export default function Navbar({ setSidebarOpen }) {
   ];
 
   // Only render Navbar if logged in and not on login page, and if it's a sales executive
-  // This component is specifically for sales_executive. Admin and Delivery Head will have their own Navbars.
   if (!isLoggedIn || onLoginPage || userRole !== 'sales_executive') {
-    return null; 
+    return null; // Don't render this Navbar for admin or delivery head, or if not logged in
   }
 
   return (
