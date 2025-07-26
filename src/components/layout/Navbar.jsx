@@ -37,7 +37,7 @@ export default function Navbar({ setSidebarOpen }) {
     { name: 'Projects', href: '/projects' },
     { name: 'Updates', href: '/updates' },
     // FIX: Changed 'Delivery' href to a client-side route that maps to MyProjectDeliveries.jsx
-    { name: 'Delivery', href: '/MyProjectDeliveries' }, 
+    { name: 'Delivery', href: '/my-project-deliveries' }, 
   ];
 
   const tasksNavigation = [
@@ -52,7 +52,7 @@ export default function Navbar({ setSidebarOpen }) {
     { name: 'New Update', href: '/create-update' },
     { name: 'New Task', href: '/create-task' },
     // FIX: Changed 'New Delivery Status' href to a client-side route that maps to ProjectDeliveryForm.jsx
-    { name: 'New Delivery Status', href: '/CreateDeliveryStatus' }, 
+    { name: 'New Delivery Status', href: '/create-delivery-status' }, 
   ];
 
   const userNavigation = [
