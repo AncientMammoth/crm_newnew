@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { Listbox, Transition } from '@headlessui/react';
+import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { api } from '../api'; // Import the axios instance
 
 // Helper to convert 'Yes'/'No'/'N/A' to boolean/null for backend
@@ -32,7 +34,7 @@ const fetchDeliveryStatusForEdit = async (id) => {
     throw new Error('Delivery status not found.');
   } catch (error) {
     const errorMessage = error.response?.data?.error || error.message || 'Failed to fetch delivery status for edit.';
-    throw new new Error(errorMessage);
+    throw new Error(errorMessage);
   }
 };
 
@@ -55,6 +57,10 @@ const fetchProjects = async () => {
   }
 };
 
+function classNames(...classes) {
+  return classes.filter(Boolean).join(' ');
+}
+
 export default function ProjectDeliveryForm() {
   const { id } = useParams(); // Get ID from URL for edit mode
   const navigate = useNavigate();
@@ -72,6 +78,8 @@ export default function ProjectDeliveryForm() {
     queryKey: ['projects'],
     queryFn: fetchProjects,
   });
+
+  const [selectedProject, setSelectedProject] = useState(null);
 
   const [formData, setFormData] = useState({
     crm_project_id: '',
@@ -99,6 +107,14 @@ export default function ProjectDeliveryForm() {
     target_languages: '',
     formatting_required: 'N/A',
   });
+  
+    useEffect(() => {
+        if (projects && projects.length > 0) {
+            const currentProject = projects.find(p => p.id === formData.crm_project_id);
+            setSelectedProject(currentProject);
+        }
+    }, [formData.crm_project_id, projects]);
+
 
   useEffect(() => {
     if (isEditMode && existingStatus) {
@@ -135,13 +151,32 @@ export default function ProjectDeliveryForm() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+    
+  const handleSelectChange = (name, value) => {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleProjectChange = (project) => {
+    setSelectedProject(project);
+    setFormData((prev) => ({ ...prev, crm_project_id: project.id }));
+  };
+
 
   const createDeliveryStatus = useMutation({
     mutationFn: async (newStatus) => {
       const secretKey = localStorage.getItem('secretKey');
       if (!secretKey) throw new Error('Secret key not found.');
+      
+      const payload = { ...newStatus };
+      // Convert 'Yes'/'No'/'N/A' strings back to boolean/null for the backend
+      Object.keys(payload).forEach(key => {
+        if (['open_project_files_provided', 'voice_match_needed', 'lip_match_needed', 'sound_balancing_needed', 'premix_files_shared', 'me_files_shared', 'high_res_video_shared', 'on_screen_editing_required', 'formatting_required'].includes(key)) {
+            payload[key] = convertToBooleanOrNull(payload[key]);
+        }
+      });
+
       try {
-        const response = await api.post('/delivery-status', newStatus);
+        const response = await api.post('/delivery-status', payload);
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.error || error.message || 'Failed to create delivery status.');
@@ -160,8 +195,17 @@ export default function ProjectDeliveryForm() {
     mutationFn: async ({ id, updatedStatus }) => {
       const secretKey = localStorage.getItem('secretKey');
       if (!secretKey) throw new Error('Secret key not found.');
+      
+      const payload = { ...updatedStatus };
+      // Convert 'Yes'/'No'/'N/A' strings back to boolean/null for the backend
+      Object.keys(payload).forEach(key => {
+        if (['open_project_files_provided', 'voice_match_needed', 'lip_match_needed', 'sound_balancing_needed', 'premix_files_shared', 'me_files_shared', 'high_res_video_shared', 'on_screen_editing_required', 'formatting_required'].includes(key)) {
+            payload[key] = convertToBooleanOrNull(payload[key]);
+        }
+      });
+
       try {
-        const response = await api.put(`/delivery-status/${id}`, updatedStatus);
+        const response = await api.put(`/delivery-status/${id}`, payload);
         return response.data;
       } catch (error) {
         throw new Error(error.response?.data?.error || error.message || 'Failed to update delivery status.');
@@ -210,6 +254,34 @@ export default function ProjectDeliveryForm() {
     }
   };
 
+  const renderDropdown = (name, label, options) => (
+    <Listbox value={formData[name]} onChange={(value) => handleSelectChange(name, value)}>
+      <div>
+        <Listbox.Label className="block text-sm font-light text-muted-foreground">{label}</Listbox.Label>
+        <div className="mt-1 relative">
+          <Listbox.Button className="relative w-full bg-secondary border border-border rounded-md shadow-sm pl-3 pr-10 py-3 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm">
+            <span className="block truncate text-foreground">{options.find(opt => opt.value === formData[name])?.label || options[0].label}</span>
+            <span className="ml-3 absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none"><ChevronUpDownIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" /></span>
+          </Listbox.Button>
+          <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+            <Listbox.Options className="absolute z-10 mt-1 w-full bg-secondary shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+              {options.map(option => (
+                <Listbox.Option key={option.value} className={({ active }) => classNames(active ? 'text-white bg-primary/20' : 'text-foreground', 'cursor-default select-none relative py-2 pl-3 pr-9')} value={option.value}>
+                  {({ selected, active }) => (
+                    <>
+                      <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>{option.label}</span>
+                      {selected ? <span className={classNames(active ? 'text-white' : 'text-accent', 'absolute inset-y-0 right-0 flex items-center pr-4')}><CheckIcon className="h-5 w-5" aria-hidden="true" /></span> : null}
+                    </>
+                  )}
+                </Listbox.Option>
+              ))}
+            </Listbox.Options>
+          </Transition>
+        </div>
+      </div>
+    </Listbox>
+  );
+
   if (isLoadingStatus || isLoadingProjects) {
     return (
       <div className="text-center py-20 text-lg text-muted-foreground">
@@ -239,300 +311,133 @@ export default function ProjectDeliveryForm() {
     { value: 'QVO', label: 'QVO (Quality Voice Over)' },
     { value: 'DT', label: 'DT (Document Translation)' },
   ];
-
-  const booleanOptions = ['Yes', 'No', 'N/A'];
+  
+  const booleanOptions = [
+      { value: 'N/A', label: 'N/A' },
+      { value: 'Yes', label: 'Yes' },
+      { value: 'No', label: 'No' },
+  ];
+  
+  const booleanSelectOptions = ['Yes', 'No', 'N/A'];
 
   return (
-    <div className="min-h-screen bg-card w-full">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-20">
+    <div className="min-h-screen bg-card flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          className="max-w-4xl w-full space-y-8"
         >
-          <h1 className="text-4xl font-light text-foreground mb-8">
-            {isEditMode ? 'Edit Project Delivery Status' : 'Create New Project Delivery Status'}
-          </h1>
+          <div className="text-center">
+             <h1 className="text-4xl font-light text-foreground">
+                {isEditMode ? 'Edit Project Delivery Status' : 'Create New Project Delivery Status'}
+             </h1>
+             <p className="mt-2 text-lg text-muted-foreground">Fill in the details for the project delivery.</p>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6 bg-secondary p-8 rounded-lg shadow-md border border-border">
+        <div className="bg-[#333333] p-10 rounded-2xl border border-border">
+          <form onSubmit={handleSubmit} className="space-y-8">
             {/* CRM Project ID - Dropdown */}
-            <div>
-              <label htmlFor="crm_project_id" className="block text-sm font-medium text-muted-foreground mb-1">
-                CRM Project
-              </label>
-              <select
-                id="crm_project_id"
-                name="crm_project_id"
-                value={formData.crm_project_id}
-                onChange={handleChange}
-                required
-                className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              >
-                <option value="" className="bg-input text-foreground">Select a Project</option>
-                {projects?.map((project) => (
-                  <option key={project.id} value={project.id} className="bg-input text-foreground">
-                    {project.project_name} (ID: {project.id})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Listbox value={selectedProject} onChange={handleProjectChange}>
+                <div>
+                    <Listbox.Label className="block text-sm font-light text-muted-foreground">CRM Project</Listbox.Label>
+                    <div className="mt-1 relative">
+                        <Listbox.Button className="relative w-full bg-secondary border border-border rounded-md shadow-sm pl-3 pr-10 py-3 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm">
+                            <span className="block truncate text-foreground">{selectedProject ? `${selectedProject.project_name} (ID: ${selectedProject.id})` : "Select a Project"}</span>
+                            <span className="ml-3 absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none"><ChevronUpDownIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" /></span>
+                        </Listbox.Button>
+                        <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                            <Listbox.Options className="absolute z-10 mt-1 w-full bg-secondary shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                                {projects?.map((project) => (
+                                    <Listbox.Option key={project.id} className={({ active }) => classNames(active ? 'text-white bg-primary/20' : 'text-foreground', 'cursor-default select-none relative py-2 pl-3 pr-9')} value={project}>
+                                        {({ selected, active }) => (
+                                            <>
+                                                <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>
+                                                    {project.project_name} (ID: {project.id})
+                                                </span>
+                                                {selected ? <span className={classNames(active ? 'text-white' : 'text-accent', 'absolute inset-y-0 right-0 flex items-center pr-4')}><CheckIcon className="h-5 w-5" aria-hidden="true" /></span> : null}
+                                            </>
+                                        )}
+                                    </Listbox.Option>
+                                ))}
+                            </Listbox.Options>
+                        </Transition>
+                    </div>
+                </div>
+            </Listbox>
 
             {/* Project Type */}
-            <div>
-              <label htmlFor="project_type" className="block text-sm font-medium text-muted-foreground mb-1">
-                Project Type
-              </label>
-              <select
-                id="project_type"
-                name="project_type"
-                value={formData.project_type}
-                onChange={handleChange}
-                required
-                className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              >
-                {projectTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-input text-foreground">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderDropdown('project_type', 'Project Type', projectTypeOptions)}
 
             {/* Service Type */}
             <div>
-              <label htmlFor="service_type" className="block text-sm font-medium text-muted-foreground mb-1">
+              <label htmlFor="service_type" className="block text-sm font-light text-muted-foreground">
                 Service Type
               </label>
-              <input
-                type="text"
-                id="service_type"
-                name="service_type"
-                value={formData.service_type}
-                onChange={handleChange}
-                required
-                className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
+              <div className="mt-1">
+                 <input
+                    type="text"
+                    id="service_type"
+                    name="service_type"
+                    value={formData.service_type}
+                    onChange={handleChange}
+                    required
+                    className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"
+                />
+              </div>
             </div>
 
             {/* Fields for QVO Project Type */}
             {formData.project_type === 'QVO' && (
               <>
                 <div>
-                  <label htmlFor="number_of_files" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Number of Files
-                  </label>
-                  <input
-                    type="number"
-                    id="number_of_files"
-                    name="number_of_files"
-                    value={formData.number_of_files}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="number_of_files" className="block text-sm font-light text-muted-foreground">Number of Files</label>
+                  <div className="mt-1">
+                  <input type="number" id="number_of_files" name="number_of_files" value={formData.number_of_files} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="total_duration_minutes" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Total Duration (Minutes)
-                  </label>
-                  <input
-                    type="number"
-                    id="total_duration_minutes"
-                    name="total_duration_minutes"
-                    value={formData.total_duration_minutes}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="total_duration_minutes" className="block text-sm font-light text-muted-foreground">Total Duration (Minutes)</label>
+                  <div className="mt-1">
+                  <input type="number" id="total_duration_minutes" name="total_duration_minutes" value={formData.total_duration_minutes} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="language_pair" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Language Pair
-                  </label>
-                  <input
-                    type="text"
-                    id="language_pair"
-                    name="language_pair"
-                    value={formData.language_pair}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="language_pair" className="block text-sm font-light text-muted-foreground">Language Pair</label>
+                  <div className="mt-1">
+                  <input type="text" id="language_pair" name="language_pair" value={formData.language_pair} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="target_language_dialect" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Target Language Dialect
-                  </label>
-                  <input
-                    type="text"
-                    id="target_language_dialect"
-                    name="target_language_dialect"
-                    value={formData.target_language_dialect}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="target_language_dialect" className="block text-sm font-light text-muted-foreground">Target Language Dialect</label>
+                  <div className="mt-1">
+                  <input type="text" id="target_language_dialect" name="target_language_dialect" value={formData.target_language_dialect} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="voice_over_gender" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Voice Over Gender
-                  </label>
-                  <input
-                    type="text"
-                    id="voice_over_gender"
-                    name="voice_over_gender"
-                    value={formData.voice_over_gender}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="voice_over_gender" className="block text-sm font-light text-muted-foreground">Voice Over Gender</label>
+                  <div className="mt-1">
+                  <input type="text" id="voice_over_gender" name="voice_over_gender" value={formData.voice_over_gender} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
+                {renderDropdown('voice_match_needed', 'Voice Match Needed?', booleanOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('lip_match_needed', 'Lip Match Needed?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('sound_balancing_needed', 'Sound Balancing Needed?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('premix_files_shared', 'Premix Files Shared?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('me_files_shared', 'M&E Files Shared?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('high_res_video_shared', 'High-Res Video Shared?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
                 <div>
-                  <label htmlFor="voice_match_needed" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Voice Match Needed?
-                  </label>
-                  <select
-                    id="voice_match_needed"
-                    name="voice_match_needed"
-                    value={formData.voice_match_needed}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                  <label htmlFor="caption_type" className="block text-sm font-light text-muted-foreground">Caption Type</label>
+                  <div className="mt-1">
+                  <input type="text" id="caption_type" name="caption_type" value={formData.caption_type} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
+                {renderDropdown('on_screen_editing_required', 'On-Screen Editing Required?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
                 <div>
-                  <label htmlFor="lip_match_needed" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Lip Match Needed?
-                  </label>
-                  <select
-                    id="lip_match_needed"
-                    name="lip_match_needed"
-                    value={formData.lip_match_needed}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="sound_balancing_needed" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Sound Balancing Needed?
-                  </label>
-                  <select
-                    id="sound_balancing_needed"
-                    name="sound_balancing_needed"
-                    value={formData.sound_balancing_needed}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="premix_files_shared" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Premix Files Shared?
-                  </label>
-                  <select
-                    id="premix_files_shared"
-                    name="premix_files_shared"
-                    value={formData.premix_files_shared}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="me_files_shared" className="block text-sm font-medium text-muted-foreground mb-1">
-                    M&E Files Shared?
-                  </label>
-                  <select
-                    id="me_files_shared"
-                    name="me_files_shared"
-                    value={formData.me_files_shared}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="high_res_video_shared" className="block text-sm font-medium text-muted-foreground mb-1">
-                    High-Res Video Shared?
-                  </label>
-                  <select
-                    id="high_res_video_shared"
-                    name="high_res_video_shared"
-                    value={formData.high_res_video_shared}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="caption_type" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Caption Type
-                  </label>
-                  <input
-                    type="text"
-                    id="caption_type"
-                    name="caption_type"
-                    value={formData.caption_type}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="on_screen_editing_required" className="block text-sm font-medium text-muted-foreground mb-1">
-                    On-Screen Editing Required?
-                  </label>
-                  <select
-                    id="on_screen_editing_required"
-                    name="on_screen_editing_required"
-                    value={formData.on_screen_editing_required}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="deliverable" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Deliverable
-                  </label>
-                  <input
-                    type="text"
-                    id="deliverable"
-                    name="deliverable"
-                    value={formData.deliverable}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="deliverable" className="block text-sm font-light text-muted-foreground">Deliverable</label>
+                  <div className="mt-1">
+                  <input type="text" id="deliverable" name="deliverable" value={formData.deliverable} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
               </>
             )}
@@ -541,132 +446,63 @@ export default function ProjectDeliveryForm() {
             {formData.project_type === 'DT' && (
               <>
                 <div>
-                  <label htmlFor="source_word_count" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Source Word Count
-                  </label>
-                  <input
-                    type="number"
-                    id="source_word_count"
-                    name="source_word_count"
-                    value={formData.source_word_count}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="source_word_count" className="block text-sm font-light text-muted-foreground">Source Word Count</label>
+                  <div className="mt-1">
+                  <input type="number" id="source_word_count" name="source_word_count" value={formData.source_word_count} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="source_languages" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Source Languages
-                  </label>
-                  <input
-                    type="text"
-                    id="source_languages"
-                    name="source_languages"
-                    value={formData.source_languages}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="source_languages" className="block text-sm font-light text-muted-foreground">Source Languages</label>
+                  <div className="mt-1">
+                  <input type="text" id="source_languages" name="source_languages" value={formData.source_languages} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="target_languages" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Target Languages
-                  </label>
-                  <input
-                    type="text"
-                    id="target_languages"
-                    name="target_languages"
-                    value={formData.target_languages}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  />
+                  <label htmlFor="target_languages" className="block text-sm font-light text-muted-foreground">Target Languages</label>
+                  <div className="mt-1">
+                  <input type="text" id="target_languages" name="target_languages" value={formData.target_languages} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="formatting_required" className="block text-sm font-medium text-muted-foreground mb-1">
-                    Formatting Required?
-                  </label>
-                  <select
-                    id="formatting_required"
-                    name="formatting_required"
-                    value={formData.formatting_required}
-                    onChange={handleChange}
-                    className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                  >
-                    {booleanOptions.map((option) => (
-                      <option key={option} value={option} className="bg-input text-foreground">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {renderDropdown('formatting_required', 'Formatting Required?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
               </>
             )}
 
             {/* Common Fields */}
             <div>
-              <label htmlFor="deadline" className="block text-sm font-medium text-muted-foreground mb-1">
-                Deadline
-              </label>
-              <input
-                type="date"
-                id="deadline"
-                name="deadline"
-                value={formData.deadline}
-                onChange={handleChange}
-                className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
+              <label htmlFor="deadline" className="block text-sm font-light text-muted-foreground">Deadline</label>
+              <div className="mt-1">
+              <input type="date" id="deadline" name="deadline" value={formData.deadline} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+              </div>
             </div>
 
             <div>
-              <label htmlFor="output_format" className="block text-sm font-medium text-muted-foreground mb-1">
-                Output Format
-              </label>
-              <input
-                type="text"
-                id="output_format"
-                name="output_format"
-                value={formData.output_format}
-                onChange={handleChange}
-                className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
+              <label htmlFor="output_format" className="block text-sm font-light text-muted-foreground">Output Format</label>
+              <div className="mt-1">
+              <input type="text" id="output_format" name="output_format" value={formData.output_format} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="open_project_files_provided" className="block text-sm font-medium text-muted-foreground mb-1">
-                Open Project Files Provided?
-              </label>
-              <select
-                id="open_project_files_provided"
-                name="open_project_files_provided"
-                value={formData.open_project_files_provided}
-                onChange={handleChange}
-                className="block w-full rounded-md border-border bg-input py-2 px-3 text-foreground shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              >
-                {booleanOptions.map((option) => (
-                  <option key={option} value={option} className="bg-input text-foreground">
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderDropdown('open_project_files_provided', 'Open Project Files Provided?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
 
-            <div className="flex justify-end space-x-3">
-              <button
+            <div className="flex justify-end pt-4 space-x-3">
+               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="rounded-md bg-gray-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
+                className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 transition-colors"
+                >
+                    Cancel
+                </button>
               <button
                 type="submit"
-                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-background shadow-sm hover:bg-primary/90 transition-colors"
+                className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
                 disabled={createDeliveryStatus.isPending || updateDeliveryStatus.isPending}
               >
                 {createDeliveryStatus.isPending || updateDeliveryStatus.isPending ? 'Saving...' : (isEditMode ? 'Update Status' : 'Create Status')}
               </button>
             </div>
           </form>
+          </div>
         </motion.div>
-      </div>
     </div>
   );
 }
