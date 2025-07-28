@@ -58,11 +58,29 @@ export default function Navbar({ setSidebarOpen }) {
     { name: 'Sign out', href: '/login' }, // Sign out redirects to login
   ];
 
-  // Only render Navbar if logged in and not on login page, and if it's a sales executive
-  if (!isLoggedIn || onLoginPage || userRole !== 'sales_executive') {
-    return null; // Don't render this Navbar for admin or delivery head, or if not logged in
+  // If on login page or not logged in, show a simple navbar with the logo on the left.
+  if (onLoginPage || !isLoggedIn) {
+    return (
+      <header className="sticky top-0 z-30 flex h-16 w-full flex-shrink-0 items-center bg-card shadow-md">
+        <div className="flex flex-1 items-center justify-between px-4 sm:px-6 lg:px-8">
+            <Link to="/" className="flex items-center space-x-2">
+                <img
+                className="h-8 w-auto"
+                src="/rian-logo-footer.svg"
+                alt="Rian Logo"
+                />
+            </Link>
+        </div>
+      </header>
+    );
   }
 
+  // For logged-in users, only render the full navbar for 'sales_executive'
+  if (userRole !== 'sales_executive') {
+    return null; 
+  }
+
+  // Render the full functional navbar for sales executives
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full flex-shrink-0 items-center bg-card shadow-md">
       
@@ -214,16 +232,7 @@ export default function Navbar({ setSidebarOpen }) {
                         )}
                         onClick={() => {
                             if (item.name === 'Sign out') {
-                                localStorage.removeItem('secretKey');
-                                localStorage.removeItem('userName');
-                                localStorage.removeItem('userRole'); // Clear role on sign out
-                                localStorage.removeItem('userId'); // Clear userId on sign out
-                                localStorage.removeItem('accountIds');
-                                localStorage.removeItem('projectIds');
-                                localStorage.removeItem('taskIdsAssigned');
-                                localStorage.removeItem('taskIdsCreated');
-                                localStorage.removeItem('updateIds');
-                                localStorage.removeItem('deliveryStatusIds'); // Clear new delivery status IDs
+                                localStorage.clear();
                             }
                         }}
                       >
