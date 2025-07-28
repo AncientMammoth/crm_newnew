@@ -109,9 +109,9 @@ export default function ProjectDeliveryForm() {
   });
   
     useEffect(() => {
-        if (projects && projects.length > 0) {
+        if (projects && projects.length > 0 && formData.crm_project_id) {
             const currentProject = projects.find(p => p.id === formData.crm_project_id);
-            setSelectedProject(currentProject);
+            setSelectedProject(currentProject || null);
         }
     }, [formData.crm_project_id, projects]);
 
@@ -260,7 +260,7 @@ export default function ProjectDeliveryForm() {
         <Listbox.Label className="block text-sm font-light text-muted-foreground">{label}</Listbox.Label>
         <div className="mt-1 relative">
           <Listbox.Button className="relative w-full bg-secondary border border-border rounded-md shadow-sm pl-3 pr-10 py-3 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm">
-            <span className="block truncate text-foreground">{options.find(opt => opt.value === formData[name])?.label || options[0].label}</span>
+            <span className="block truncate text-foreground">{(options.find(opt => opt.value === formData[name])?.label) || 'Select...'}</span>
             <span className="ml-3 absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none"><ChevronUpDownIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" /></span>
           </Listbox.Button>
           <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
@@ -317,8 +317,6 @@ export default function ProjectDeliveryForm() {
       { value: 'Yes', label: 'Yes' },
       { value: 'No', label: 'No' },
   ];
-  
-  const booleanSelectOptions = ['Yes', 'No', 'N/A'];
 
   return (
     <div className="min-h-screen bg-card flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -330,7 +328,7 @@ export default function ProjectDeliveryForm() {
         >
           <div className="text-center">
              <h1 className="text-4xl font-light text-foreground">
-                {isEditMode ? 'Edit Project Delivery Order' : 'Create New Project Delivery Order'}
+                {isEditMode ? 'Edit Project Delivery Status' : 'Create New Project Delivery Status'}
              </h1>
              <p className="mt-2 text-lg text-muted-foreground">Fill in the details for the project delivery.</p>
           </div>
@@ -420,19 +418,19 @@ export default function ProjectDeliveryForm() {
                   <input type="text" id="voice_over_gender" name="voice_over_gender" value={formData.voice_over_gender} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
                   </div>
                 </div>
-                {renderDropdown('voice_match_needed', 'Voice Match Needed?', booleanOptions.map(o => ({ value: o, label: o })))}
-                {renderDropdown('lip_match_needed', 'Lip Match Needed?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
-                {renderDropdown('sound_balancing_needed', 'Sound Balancing Needed?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
-                {renderDropdown('premix_files_shared', 'Premix Files Shared?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
-                {renderDropdown('me_files_shared', 'M&E Files Shared?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
-                {renderDropdown('high_res_video_shared', 'High-Res Video Shared?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('voice_match_needed', 'Voice Match Needed?', booleanOptions)}
+                {renderDropdown('lip_match_needed', 'Lip Match Needed?', booleanOptions)}
+                {renderDropdown('sound_balancing_needed', 'Sound Balancing Needed?', booleanOptions)}
+                {renderDropdown('premix_files_shared', 'Premix Files Shared?', booleanOptions)}
+                {renderDropdown('me_files_shared', 'M&E Files Shared?', booleanOptions)}
+                {renderDropdown('high_res_video_shared', 'High-Res Video Shared?', booleanOptions)}
                 <div>
                   <label htmlFor="caption_type" className="block text-sm font-light text-muted-foreground">Caption Type</label>
                   <div className="mt-1">
                   <input type="text" id="caption_type" name="caption_type" value={formData.caption_type} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
                   </div>
                 </div>
-                {renderDropdown('on_screen_editing_required', 'On-Screen Editing Required?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('on_screen_editing_required', 'On-Screen Editing Required?', booleanOptions)}
                 <div>
                   <label htmlFor="deliverable" className="block text-sm font-light text-muted-foreground">Deliverable</label>
                   <div className="mt-1">
@@ -463,7 +461,7 @@ export default function ProjectDeliveryForm() {
                   <input type="text" id="target_languages" name="target_languages" value={formData.target_languages} onChange={handleChange} className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"/>
                   </div>
                 </div>
-                {renderDropdown('formatting_required', 'Formatting Required?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+                {renderDropdown('formatting_required', 'Formatting Required?', booleanOptions)}
               </>
             )}
 
@@ -482,7 +480,7 @@ export default function ProjectDeliveryForm() {
               </div>
             </div>
 
-            {renderDropdown('open_project_files_provided', 'Open Project Files Provided?', booleanSelectOptions.map(o => ({ value: o, label: o })))}
+            {renderDropdown('open_project_files_provided', 'Open Project Files Provided?', booleanOptions)}
 
             <div className="flex justify-end pt-4 space-x-3">
                <button
@@ -497,7 +495,7 @@ export default function ProjectDeliveryForm() {
                 className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
                 disabled={createDeliveryStatus.isPending || updateDeliveryStatus.isPending}
               >
-                {createDeliveryStatus.isPending || updateDeliveryStatus.isPending ? 'Saving...' : (isEditMode ? 'Update Order' : 'Create Order')}
+                {createDeliveryStatus.isPending || updateDeliveryStatus.isPending ? 'Saving...' : (isEditMode ? 'Update Status' : 'Create Status')}
               </button>
             </div>
           </form>
