@@ -330,7 +330,7 @@ export default function ProjectDeliveryForm() {
         >
           <div className="text-center">
              <h1 className="text-4xl font-light text-foreground">
-                {isEditMode ? 'Edit Project Delivery Status' : 'Create New Project Delivery Status'}
+                {isEditMode ? 'Edit Project Delivery Order' : 'Create New Project Delivery Order'}
              </h1>
              <p className="mt-2 text-lg text-muted-foreground">Fill in the details for the project delivery.</p>
           </div>
@@ -497,7 +497,7 @@ export default function ProjectDeliveryForm() {
                 className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
                 disabled={createDeliveryStatus.isPending || updateDeliveryStatus.isPending}
               >
-                {createDeliveryStatus.isPending || updateDeliveryStatus.isPending ? 'Saving...' : (isEditMode ? 'Update Status' : 'Create Status')}
+                {createDeliveryStatus.isPending || updateDeliveryStatus.isPending ? 'Saving...' : (isEditMode ? 'Update Order' : 'Create Order')}
               </button>
             </div>
           </form>

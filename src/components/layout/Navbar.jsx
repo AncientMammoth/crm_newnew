@@ -36,7 +36,7 @@ export default function Navbar({ setSidebarOpen }) {
     { name: 'Accounts', href: '/accounts' },
     { name: 'Projects', href: '/projects' },
     { name: 'Updates', href: '/updates' },
-    { name: 'Delivery', href: '/delivery' }, // New Delivery link
+    { name: 'Orders', href: '/delivery' }, // New Delivery link
   ];
 
   const tasksNavigation = [
@@ -50,7 +50,7 @@ export default function Navbar({ setSidebarOpen }) {
     { name: 'New Project', href: '/create-project' },
     { name: 'New Update', href: '/create-update' },
     { name: 'New Task', href: '/create-task' },
-    { name: 'New Delivery Status', href: '/delivery/create' }, // New Quick Create for Delivery Status
+    { name: 'New Order', href: '/delivery/create' }, // New Quick Create for Delivery Status
   ];
 
   const userNavigation = [

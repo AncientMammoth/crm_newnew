@@ -73,7 +73,7 @@ export default function MyProjectDeliveries() {
               className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-background shadow-sm hover:bg-primary/90 transition-colors"
             >
               <PlusIcon className="-ml-0.5 mr-2 h-4 w-4" aria-hidden="true" />
-              New Delivery Status
+              New Order
             </Link>
           </div>
 
