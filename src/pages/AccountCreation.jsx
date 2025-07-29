@@ -1,13 +1,13 @@
-import React, { useState, Fragment, useEffect } from "react";
+import React, { useState, Fragment } from "react";
 import { createAccount } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { BuildingOfficeIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { BuildingOfficeIcon, AlertTriangle, CheckCircle } from "lucide-react";
 import { motion } from 'framer-motion';
 
 const ACCOUNT_TYPE_OPTIONS = [
   "Channel Partner",
-  "Client", 
+  "Client",
   "Vendor",
   "Technology Partner",
   "Internal Initiative",
@@ -20,26 +20,29 @@ function classNames(...classes) {
 // A reusable Toast Notification component
 const Notification = ({ show, onHide, message, type }) => {
   if (!show) return null;
-  
+
   const baseClasses = "fixed top-20 right-5 w-full max-w-sm p-4 rounded-xl shadow-lg text-white transform transition-all duration-300 ease-in-out z-50";
   const typeClasses = {
     success: "bg-green-500",
     error: "bg-red-500",
   };
-  
-  const Icon = type === 'success' ? CheckCircleIcon : ExclamationTriangleIcon;
-  
+  const Icon = type === 'success' ? CheckCircle : AlertTriangle;
+
   return (
-    <div className={`${baseClasses} ${typeClasses[type]}`}>
-      <div className="flex items-center">
-        <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
-        <p className="text-sm font-medium flex-1">{message}</p>
-        <button 
-          onClick={onHide}
-          className="ml-3 text-white hover:text-gray-200"
-        >
-          <XMarkIcon className="w-4 h-4" />
-        </button>
+    <div className={`${baseClasses} ${typeClasses[type]} ${show ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
+      <div className="flex items-start">
+        <div className="flex-shrink-0">
+          <Icon className="h-6 w-6 text-white" aria-hidden="true" />
+        </div>
+        <div className="ml-3 w-0 flex-1 pt-0.5">
+          <p className="text-sm font-medium">{message}</p>
+        </div>
+        <div className="ml-4 flex-shrink-0 flex">
+          <button onClick={onHide} className="inline-flex rounded-md text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <span className="sr-only">Close</span>
+            <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -51,17 +54,34 @@ export default function AccountCreation() {
   const [accountDescription, setAccountDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  const [errors, setErrors] = useState({});
 
   const showNotification = (message, type = 'success') => {
     setNotification({ show: true, message, type });
     setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 5000);
   };
 
+  const validateField = (name, value) => {
+    if (!value.trim()) {
+      return `${name} is required.`;
+    }
+    return '';
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    const error = validateField(name, value);
+    setErrors(prev => ({ ...prev, [name]: error }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!accountName.trim()) {
-      showNotification("Please enter an account name", "error");
+    setErrors({});
+
+    const nameError = validateField("Account Name", accountName);
+    if (nameError) {
+      setErrors({ "Account Name": nameError });
+      showNotification("Please fill out all required fields.", "error");
       return;
     }
 
@@ -76,14 +96,14 @@ export default function AccountCreation() {
       };
 
       await createAccount(accountData);
-      
+
       showNotification("Account created successfully!", "success");
-      
+
       // Reset form
       setAccountName("");
       setAccountType(ACCOUNT_TYPE_OPTIONS[0]);
       setAccountDescription("");
-      
+
     } catch (error) {
       console.error("Failed to create account:", error);
       showNotification(
@@ -97,133 +117,109 @@ export default function AccountCreation() {
 
   return (
     <>
-      <Notification 
+      <Notification
         show={notification.show}
         onHide={() => setNotification({ show: false, message: '', type: 'success' })}
         message={notification.message}
         type={notification.type}
       />
-      
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 py-12 px-4 sm:px-6 lg:px-8">
-        <motion.div 
+
+      <div className="min-h-screen bg-card flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="max-w-2xl mx-auto"
+          className="max-w-4xl w-full space-y-8"
         >
-          <div className="bg-white shadow-2xl rounded-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-6">
-              <div className="flex items-center">
-                <BuildingOfficeIcon className="w-8 h-8 text-white mr-4" />
+          <div className="text-center">
+            <h2 className="text-4xl font-light text-foreground">
+              Create a New Account
+            </h2>
+            <p className="mt-2 text-lg text-muted-foreground">
+              Add a new client, partner, or vendor to your CRM.
+            </p>
+          </div>
+
+          <div className="bg-[#333333] p-10 rounded-2xl border border-border">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <h1 className="text-2xl font-bold text-white">Create New Account</h1>
-                  <p className="text-green-100 mt-1">Add a new client, partner, or vendor to your CRM.</p>
+                  <label htmlFor="account-name" className="block text-sm font-light text-muted-foreground mb-1">Account Name</label>
+                  <input
+                    id="account-name"
+                    name="Account Name"
+                    required
+                    type="text"
+                    placeholder="e.g., Stark Industries"
+                    className={`appearance-none relative block w-full px-3 py-3 border ${errors['Account Name'] ? 'border-red-500' : 'border-border'} bg-secondary placeholder-muted-foreground text-foreground rounded-md focus:outline-none focus:ring-primary focus:border-primary sm:text-sm`}
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                    onBlur={handleBlur}
+                  />
+                  {errors['Account Name'] && <p className="mt-2 text-sm text-red-500">{errors['Account Name']}</p>}
                 </div>
-              </div>
-            </div>
 
-            <form onSubmit={handleSubmit} className="px-8 py-6 space-y-6">
-              {/* Account Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Account Name *
-                </label>
-                <input
-                  type="text"
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Enter account name..."
-                  required
-                />
-              </div>
-
-              {/* Account Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Account Type *
-                </label>
                 <Listbox value={accountType} onChange={setAccountType}>
-                  <div className="relative">
-                    <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-3 pl-4 pr-10 text-left border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500">
-                      <span className="block truncate">{accountType}</span>
-                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                      </span>
-                    </Listbox.Button>
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        {ACCOUNT_TYPE_OPTIONS.map((type, index) => (
-                          <Listbox.Option
-                            key={index}
-                            className={({ active }) =>
-                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                active ? 'bg-green-100 text-green-900' : 'text-gray-900'
-                              }`
-                            }
-                            value={type}
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                                  {type}
-                                </span>
-                                {selected && (
-                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-green-600">
-                                    <CheckIcon className="h-5 w-5" />
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </Listbox.Option>
-                        ))}
-                      </Listbox.Options>
-                    </Transition>
+                  <div>
+                    <Listbox.Label className="block text-sm font-light text-muted-foreground">Account Type</Listbox.Label>
+                    <div className="mt-1 relative">
+                      <Listbox.Button className="relative w-full bg-secondary border border-border rounded-md shadow-sm pl-3 pr-10 py-3 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm">
+                        <span className="flex items-center">
+                          <BuildingOfficeIcon className="h-5 w-5 text-muted-foreground" />
+                          <span className="ml-3 block truncate text-foreground">{accountType}</span>
+                        </span>
+                        <span className="ml-3 absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                          <ChevronUpDownIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                        </span>
+                      </Listbox.Button>
+                      <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                        <Listbox.Options className="absolute z-10 mt-1 w-full bg-secondary shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                          {ACCOUNT_TYPE_OPTIONS.map((type, index) => (
+                            <Listbox.Option key={index} className={({ active }) => classNames(active ? 'text-white bg-primary/20' : 'text-foreground', 'cursor-default select-none relative py-2 pl-3 pr-9')} value={type}>
+                              {({ selected, active }) => (
+                                <>
+                                  <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>{type}</span>
+                                  {selected ? (<span className={classNames(active ? 'text-white' : 'text-accent', 'absolute inset-y-0 right-0 flex items-center pr-4')}><CheckIcon className="h-5 w-5" aria-hidden="true" /></span>) : null}
+                                </>
+                              )}
+                            </Listbox.Option>
+                          ))}
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
                   </div>
                 </Listbox>
               </div>
 
-              {/* Account Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Account Description
-                </label>
-                <textarea
-                  value={accountDescription}
-                  onChange={(e) => setAccountDescription(e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                  placeholder="Enter account description (optional)..."
-                />
+                <label htmlFor="account-description" className="block text-sm font-light text-muted-foreground">Account Description</label>
+                <div className="mt-1">
+                  <textarea
+                    id="account-description"
+                    rows="4"
+                    placeholder="Add a detailed description for the account..."
+                    className="shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border border-border bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground"
+                    value={accountDescription}
+                    onChange={(e) => setAccountDescription(e.target.value)}
+                  />
+                </div>
               </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end space-x-4 pt-6">
-                <button
-                  type="button"
-                  onClick={() => window.history.back()}
-                  className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200"
-                >
-                  Cancel
-                </button>
+              <div className="flex justify-end pt-4">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Creating...
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-background" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating Account...
                     </>
-                  ) : (
-                    'Create Account'
-                  )}
+                  ) : "Create Account"}
                 </button>
               </div>
             </form>

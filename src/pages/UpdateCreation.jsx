@@ -1,13 +1,13 @@
-import React, { useState, Fragment, useEffect } from "react";
+import React, { useState, Fragment, useEffect, useRef } from "react";
 import { createUpdate } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { PencilSquareIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { Pencil, Calendar, AlertTriangle, CheckCircle, Briefcase, ListTodo } from "lucide-react";
 import { motion } from 'framer-motion';
 
 const UPDATE_TYPE_OPTIONS = [
   "Call",
-  "Email", 
+  "Email",
   "Meeting",
   "Follow-up",
   "Internal Discussion",
@@ -21,41 +21,48 @@ function classNames(...classes) {
 // A reusable Toast Notification component
 const Notification = ({ show, onHide, message, type }) => {
   if (!show) return null;
-  
+
   const baseClasses = "fixed top-20 right-5 w-full max-w-sm p-4 rounded-xl shadow-lg text-white transform transition-all duration-300 ease-in-out z-50";
   const typeClasses = {
     success: "bg-green-500",
     error: "bg-red-500",
   };
-  
-  const Icon = type === 'success' ? CheckCircleIcon : ExclamationTriangleIcon;
-  
+  const Icon = type === 'success' ? CheckCircle : AlertTriangle;
+
   return (
-    <div className={`${baseClasses} ${typeClasses[type]}`}>
-      <div className="flex items-center">
-        <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
-        <p className="text-sm font-medium flex-1">{message}</p>
-        <button 
-          onClick={onHide}
-          className="ml-3 text-white hover:text-gray-200"
-        >
-          <XMarkIcon className="w-4 h-4" />
-        </button>
+    <div className={`${baseClasses} ${typeClasses[type]} ${show ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
+      <div className="flex items-start">
+        <div className="flex-shrink-0">
+          <Icon className="h-6 w-6 text-white" aria-hidden="true" />
+        </div>
+        <div className="ml-3 w-0 flex-1 pt-0.5">
+          <p className="text-sm font-medium">{message}</p>
+        </div>
+        <div className="ml-4 flex-shrink-0 flex">
+          <button onClick={onHide} className="inline-flex rounded-md text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <span className="sr-only">Close</span>
+            <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
 export default function UpdateCreation() {
-  const [notes, setNotes] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [updateType, setUpdateType] = useState(UPDATE_TYPE_OPTIONS[0]);
-  const [projectId, setProjectId] = useState("");
-  const [taskId, setTaskId] = useState("");
+  const dateRef = useRef(null);
+  const [fields, setFields] = useState({
+    "Notes": "",
+    "Date": new Date().toISOString().split('T')[0],
+    "Update Type": UPDATE_TYPE_OPTIONS[0],
+    "Project": null,
+    "Task": null
+  });
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     loadUserProjects();
@@ -65,6 +72,7 @@ export default function UpdateCreation() {
     try {
       const projectIds = JSON.parse(localStorage.getItem("projectIds") || "[]");
       if (projectIds.length > 0) {
+        // This is a mock API call. Replace with your actual API call.
         const response = await fetch(`/api/projects?ids=${projectIds.join(',')}`);
         const projectsData = await response.json();
         setProjects(projectsData);
@@ -76,6 +84,7 @@ export default function UpdateCreation() {
 
   const loadProjectTasks = async (selectedProjectId) => {
     try {
+        // This is a mock API call. Replace with your actual API call.
       const response = await fetch(`/api/tasks/by-project/${selectedProjectId}`);
       const tasksData = await response.json();
       setTasks(tasksData || []);
@@ -85,11 +94,10 @@ export default function UpdateCreation() {
     }
   };
 
-  const handleProjectChange = (selectedProjectId) => {
-    setProjectId(selectedProjectId);
-    setTaskId("");
-    if (selectedProjectId) {
-      loadProjectTasks(selectedProjectId);
+  const handleProjectChange = (project) => {
+    setFields(f => ({ ...f, "Project": project, "Task": null }));
+    if (project) {
+      loadProjectTasks(project.id);
     } else {
       setTasks([]);
     }
@@ -102,36 +110,54 @@ export default function UpdateCreation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!notes.trim() || !projectId) {
-      showNotification("Please fill in all required fields", "error");
-      return;
+    setErrors({});
+
+    let hasErrors = false;
+    const newErrors = {};
+
+    if (!fields["Notes"].trim()) {
+        newErrors["Notes"] = "Notes are required.";
+        hasErrors = true;
+    }
+
+    if (!fields["Project"]) {
+        newErrors["Project"] = "Project is required.";
+        hasErrors = true;
+    }
+
+
+    if (hasErrors) {
+        setErrors(newErrors);
+        showNotification("Please fill out all required fields.", "error");
+        return;
     }
 
     setIsSubmitting(true);
 
     try {
       const updateData = {
-        "Notes": notes.trim(),
-        "Date": date,
-        "Update Type": updateType,
-        "Project": parseInt(projectId),
-        "Task": taskId ? parseInt(taskId) : null,
+        "Notes": fields["Notes"].trim(),
+        "Date": fields["Date"],
+        "Update Type": fields["Update Type"],
+        "Project": fields["Project"]?.id,
+        "Task": fields["Task"]?.id,
         "Update Owner": localStorage.getItem("secretKey")
       };
 
       await createUpdate(updateData);
-      
+
       showNotification("Update created successfully!", "success");
-      
+
       // Reset form
-      setNotes("");
-      setDate(new Date().toISOString().split('T')[0]);
-      setUpdateType(UPDATE_TYPE_OPTIONS[0]);
-      setProjectId("");
-      setTaskId("");
+      setFields({
+        "Notes": "",
+        "Date": new Date().toISOString().split('T')[0],
+        "Update Type": UPDATE_TYPE_OPTIONS[0],
+        "Project": null,
+        "Task": null
+      });
       setTasks([]);
-      
+
     } catch (error) {
       console.error("Failed to create update:", error);
       showNotification(
@@ -145,173 +171,185 @@ export default function UpdateCreation() {
 
   return (
     <>
-      <Notification 
+      <Notification
         show={notification.show}
         onHide={() => setNotification({ show: false, message: '', type: 'success' })}
         message={notification.message}
         type={notification.type}
       />
-      
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-        <motion.div 
+
+      <div className="min-h-screen bg-card flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="max-w-2xl mx-auto"
+          className="max-w-4xl w-full space-y-8"
         >
-          <div className="bg-white shadow-2xl rounded-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
-              <div className="flex items-center">
-                <PencilSquareIcon className="w-8 h-8 text-white mr-4" />
-                <div>
-                  <h1 className="text-2xl font-bold text-white">Create New Update</h1>
-                  <p className="text-blue-100 mt-1">Record project progress and communications</p>
-                </div>
-              </div>
+          <div className="text-center">
+            <h2 className="text-4xl font-light text-foreground">
+              Create a New Update
+            </h2>
+            <p className="mt-2 text-lg text-muted-foreground">
+              Record project progress and communications.
+            </p>
+          </div>
+
+          <div className="bg-[#333333] p-10 rounded-2xl border border-border">
+            <form onSubmit={handleSubmit} className="space-y-8">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Listbox value={fields["Project"]} onChange={handleProjectChange}>
+                    <div>
+                        <Listbox.Label className="block text-sm font-light text-muted-foreground">Project</Listbox.Label>
+                        <div className="mt-1 relative">
+                        <Listbox.Button className={`relative w-full bg-secondary border ${errors['Project'] ? 'border-red-500' : 'border-border'} rounded-md shadow-sm pl-3 pr-10 py-3 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm`}>
+                            <span className="flex items-center">
+                                <Briefcase className="h-5 w-5 text-muted-foreground" />
+                                <span className="ml-3 block truncate text-foreground">{fields["Project"] ? fields["Project"].project_name : "Select a project"}</span>
+                            </span>
+                            <span className="ml-3 absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                <ChevronUpDownIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                            </span>
+                        </Listbox.Button>
+                        <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                            <Listbox.Options className="absolute z-10 mt-1 w-full bg-secondary shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                                {projects.map(project => (
+                                <Listbox.Option key={project.id} className={({ active }) => classNames(active ? 'text-white bg-primary/20' : 'text-foreground', 'cursor-default select-none relative py-2 pl-3 pr-9')} value={project}>
+                                    {({ selected, active }) => (
+                                    <>
+                                        <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>{project.project_name}</span>
+                                        {selected ? (<span className={classNames(active ? 'text-white' : 'text-accent', 'absolute inset-y-0 right-0 flex items-center pr-4')}><CheckIcon className="h-5 w-5" aria-hidden="true" /></span>) : null}
+                                    </>
+                                    )}
+                                </Listbox.Option>
+                                ))}
+                            </Listbox.Options>
+                        </Transition>
+                        {errors['Project'] && <p className="mt-2 text-sm text-red-500">{errors['Project']}</p>}
+                        </div>
+                    </div>
+                </Listbox>
+
+                <Listbox value={fields["Task"]} onChange={value => setFields(f => ({...f, "Task": value}))} disabled={!fields["Project"] || tasks.length === 0}>
+                    <div>
+                        <Listbox.Label className="block text-sm font-light text-muted-foreground">Task (Optional)</Listbox.Label>
+                        <div className="mt-1 relative">
+                        <Listbox.Button className="relative w-full bg-secondary border border-border rounded-md shadow-sm pl-3 pr-10 py-3 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm disabled:opacity-50">
+                            <span className="flex items-center">
+                                <ListTodo className="h-5 w-5 text-muted-foreground" />
+                                <span className="ml-3 block truncate text-foreground">{fields["Task"] ? fields["Task"].task_name : "No specific task"}</span>
+                            </span>
+                            <span className="ml-3 absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                <ChevronUpDownIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                            </span>
+                        </Listbox.Button>
+                        <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                            <Listbox.Options className="absolute z-10 mt-1 w-full bg-secondary shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                                {tasks.map(task => (
+                                <Listbox.Option key={task.id} className={({ active }) => classNames(active ? 'text-white bg-primary/20' : 'text-foreground', 'cursor-default select-none relative py-2 pl-3 pr-9')} value={task}>
+                                    {({ selected, active }) => (
+                                    <>
+                                        <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>{task.task_name}</span>
+                                        {selected ? (<span className={classNames(active ? 'text-white' : 'text-accent', 'absolute inset-y-0 right-0 flex items-center pr-4')}><CheckIcon className="h-5 w-5" aria-hidden="true" /></span>) : null}
+                                    </>
+                                    )}
+                                </Listbox.Option>
+                                ))}
+                            </Listbox.Options>
+                        </Transition>
+                        </div>
+                    </div>
+                </Listbox>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-8 py-6 space-y-6">
-              {/* Project Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project *
-                </label>
-                <select
-                  value={projectId}
-                  onChange={(e) => handleProjectChange(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Select a project...</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.project_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Task Selection (Optional) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Task (Optional)
-                </label>
-                <select
-                  value={taskId}
-                  onChange={(e) => setTaskId(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={!projectId || tasks.length === 0}
-                >
-                  <option value="">No specific task</option>
-                  {tasks.map((task) => (
-                    <option key={task.id} value={task.id}>
-                      {task.task_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Update Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Update Type *
-                </label>
-                <Listbox value={updateType} onChange={setUpdateType}>
-                  <div className="relative">
-                    <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-3 pl-4 pr-10 text-left border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      <span className="block truncate">{updateType}</span>
-                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-                      </span>
-                    </Listbox.Button>
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        {UPDATE_TYPE_OPTIONS.map((type, index) => (
-                          <Listbox.Option
-                            key={index}
-                            className={({ active }) =>
-                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                active ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
-                              }`
-                            }
-                            value={type}
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                                  {type}
-                                </span>
-                                {selected && (
-                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
-                                    <CheckIcon className="h-5 w-5" />
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </Listbox.Option>
-                        ))}
-                      </Listbox.Options>
-                    </Transition>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Listbox value={fields["Update Type"]} onChange={value => setFields(f => ({...f, "Update Type": value}))}>
+                  <div>
+                    <Listbox.Label className="block text-sm font-light text-muted-foreground">Update Type</Listbox.Label>
+                    <div className="mt-1 relative">
+                      <Listbox.Button className="relative w-full bg-secondary border border-border rounded-md shadow-sm pl-3 pr-10 py-3 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm">
+                        <span className="flex items-center">
+                          <Pencil className="h-5 w-5 text-muted-foreground" />
+                          <span className="ml-3 block truncate text-foreground">{fields["Update Type"]}</span>
+                        </span>
+                        <span className="ml-3 absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                          <ChevronUpDownIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                        </span>
+                      </Listbox.Button>
+                      <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                        <Listbox.Options className="absolute z-10 mt-1 w-full bg-secondary shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                          {UPDATE_TYPE_OPTIONS.map(type => (
+                            <Listbox.Option key={type} className={({ active }) => classNames(active ? 'text-white bg-primary/20' : 'text-foreground', 'cursor-default select-none relative py-2 pl-3 pr-9')} value={type}>
+                              {({ selected, active }) => (
+                                <>
+                                  <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>{type}</span>
+                                  {selected ? (<span className={classNames(active ? 'text-white' : 'text-accent', 'absolute inset-y-0 right-0 flex items-center pr-4')}><CheckIcon className="h-5 w-5" aria-hidden="true" /></span>) : null}
+                                </>
+                              )}
+                            </Listbox.Option>
+                          ))}
+                        </Listbox.Options>
+                      </Transition>
+                    </div>
                   </div>
                 </Listbox>
+                <div>
+                  <label className="block text-sm font-light text-muted-foreground">Date</label>
+                  <div
+                    onClick={() => dateRef.current?.showPicker?.()}
+                    className={`mt-1 relative flex items-center w-full bg-secondary border border-border rounded-md shadow-sm pl-3 pr-3 py-3 text-left cursor-pointer focus-within:ring-1 focus-within:ring-primary focus-within:border-primary`}
+                  >
+                    <Calendar className="h-5 w-5 text-foreground" />
+                    <span className={`ml-3 block truncate ${fields["Date"] ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {fields["Date"] ? new Date(fields["Date"] + 'T00:00:00').toLocaleDateString() : "Select a date"}
+                    </span>
+                    <input
+                      ref={dateRef}
+                      id="date"
+                      name="Date"
+                      type="date"
+                      required
+                      className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+                      value={fields["Date"]}
+                      onChange={e => setFields(f => ({ ...f, "Date": e.target.value }))}
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Date */}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date *
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
+                <label htmlFor="notes" className="block text-sm font-light text-muted-foreground">Notes</label>
+                <div className="mt-1">
+                  <textarea
+                    id="notes"
+                    name="Notes"
+                    rows="4"
+                    placeholder="Add a detailed description for the update..."
+                    className={`shadow-sm focus:ring-primary focus:border-primary mt-1 block w-full sm:text-sm border ${errors['Notes'] ? 'border-red-500' : 'border-border'} bg-secondary rounded-md p-3 text-foreground placeholder-muted-foreground`}
+                    value={fields["Notes"]}
+                    onChange={e => setFields(f => ({ ...f, "Notes": e.target.value }))}
+                    required
+                  />
+                </div>
+                {errors['Notes'] && <p className="mt-2 text-sm text-red-500">{errors['Notes']}</p>}
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes *
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                  placeholder="Enter update details..."
-                  required
-                />
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex justify-end space-x-4 pt-6">
-                <button
-                  type="button"
-                  onClick={() => window.history.back()}
-                  className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200"
-                >
-                  Cancel
-                </button>
+              <div className="flex justify-end pt-4">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Creating...
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-background" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating Update...
                     </>
-                  ) : (
-                    'Create Update'
-                  )}
+                  ) : "Create Update"}
                 </button>
               </div>
             </form>
