@@ -107,7 +107,7 @@ export default function ProjectDeliveryForm() {
     target_languages: '',
     formatting_required: 'N/A',
   });
-  
+
     useEffect(() => {
         if (projects && projects.length > 0 && formData.crm_project_id) {
             const currentProject = projects.find(p => p.id === formData.crm_project_id);
@@ -151,7 +151,7 @@ export default function ProjectDeliveryForm() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-    
+
   const handleSelectChange = (name, value) => {
       setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -166,7 +166,7 @@ export default function ProjectDeliveryForm() {
     mutationFn: async (newStatus) => {
       const secretKey = localStorage.getItem('secretKey');
       if (!secretKey) throw new Error('Secret key not found.');
-      
+
       const payload = { ...newStatus };
       // Convert 'Yes'/'No'/'N/A' strings back to boolean/null for the backend
       Object.keys(payload).forEach(key => {
@@ -195,7 +195,7 @@ export default function ProjectDeliveryForm() {
     mutationFn: async ({ id, updatedStatus }) => {
       const secretKey = localStorage.getItem('secretKey');
       if (!secretKey) throw new Error('Secret key not found.');
-      
+
       const payload = { ...updatedStatus };
       // Convert 'Yes'/'No'/'N/A' strings back to boolean/null for the backend
       Object.keys(payload).forEach(key => {
@@ -311,7 +311,7 @@ export default function ProjectDeliveryForm() {
     { value: 'QVO', label: 'QVO (Quality Voice Over)' },
     { value: 'DT', label: 'DT (Document Translation)' },
   ];
-  
+
   const booleanOptions = [
       { value: 'N/A', label: 'N/A' },
       { value: 'Yes', label: 'Yes' },
@@ -482,14 +482,7 @@ export default function ProjectDeliveryForm() {
 
             {renderDropdown('open_project_files_provided', 'Open Project Files Provided?', booleanOptions)}
 
-            <div className="flex justify-end pt-4 space-x-3">
-               <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 transition-colors"
-                >
-                    Cancel
-                </button>
+            <div className="pt-4">
               <button
                 type="submit"
                 className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
