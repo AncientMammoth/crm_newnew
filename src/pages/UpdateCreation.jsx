@@ -2,7 +2,7 @@ import React, { useState, Fragment, useEffect } from "react";
 import { createUpdate } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { PencilSquareIcon, AlertTriangle, CheckCircle } from "lucide-react";
+import { PencilSquareIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { motion } from 'framer-motion';
 
 const UPDATE_TYPE_OPTIONS = [
@@ -28,7 +28,7 @@ const Notification = ({ show, onHide, message, type }) => {
     error: "bg-red-500",
   };
   
-  const Icon = type === 'success' ? CheckCircle : AlertTriangle;
+  const Icon = type === 'success' ? CheckCircleIcon : ExclamationTriangleIcon;
   
   return (
     <div className={`${baseClasses} ${typeClasses[type]}`}>
@@ -76,7 +76,6 @@ export default function UpdateCreation() {
 
   const loadProjectTasks = async (selectedProjectId) => {
     try {
-      // You'll need to implement a task endpoint that filters by project
       const response = await fetch(`/api/tasks/by-project/${selectedProjectId}`);
       const tasksData = await response.json();
       setTasks(tasksData || []);
@@ -88,7 +87,7 @@ export default function UpdateCreation() {
 
   const handleProjectChange = (selectedProjectId) => {
     setProjectId(selectedProjectId);
-    setTaskId(""); // Reset task selection
+    setTaskId("");
     if (selectedProjectId) {
       loadProjectTasks(selectedProjectId);
     } else {
@@ -118,7 +117,7 @@ export default function UpdateCreation() {
         "Update Type": updateType,
         "Project": parseInt(projectId),
         "Task": taskId ? parseInt(taskId) : null,
-        "Update Owner": localStorage.getItem("secretKey") // FIX: Use secretKey instead of empty string
+        "Update Owner": localStorage.getItem("secretKey")
       };
 
       await createUpdate(updateData);

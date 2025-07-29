@@ -2,7 +2,7 @@ import React, { useState, Fragment, useEffect } from "react";
 import { createAccount } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { Building2, AlertTriangle, CheckCircle } from "lucide-react";
+import { BuildingOfficeIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { motion } from 'framer-motion';
 
 const ACCOUNT_TYPE_OPTIONS = [
@@ -27,7 +27,7 @@ const Notification = ({ show, onHide, message, type }) => {
     error: "bg-red-500",
   };
   
-  const Icon = type === 'success' ? CheckCircle : AlertTriangle;
+  const Icon = type === 'success' ? CheckCircleIcon : ExclamationTriangleIcon;
   
   return (
     <div className={`${baseClasses} ${typeClasses[type]}`}>
@@ -72,7 +72,7 @@ export default function AccountCreation() {
         "Account Name": accountName.trim(),
         "Account Type": accountType,
         "Account Description": accountDescription.trim(),
-        "Account Owner": [localStorage.getItem("secretKey")] // FIX: Use secretKey in array format
+        "Account Owner": [localStorage.getItem("secretKey")]
       };
 
       await createAccount(accountData);
@@ -114,7 +114,7 @@ export default function AccountCreation() {
           <div className="bg-white shadow-2xl rounded-2xl overflow-hidden">
             <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-6">
               <div className="flex items-center">
-                <Building2 className="w-8 h-8 text-white mr-4" />
+                <BuildingOfficeIcon className="w-8 h-8 text-white mr-4" />
                 <div>
                   <h1 className="text-2xl font-bold text-white">Create New Account</h1>
                   <p className="text-green-100 mt-1">Add a new client, partner, or vendor to your CRM.</p>

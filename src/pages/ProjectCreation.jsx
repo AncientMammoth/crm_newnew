@@ -2,7 +2,7 @@ import React, { useState, Fragment, useEffect } from "react";
 import { createProject } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { FolderIcon, AlertTriangle, CheckCircle } from "lucide-react";
+import { FolderIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { motion } from 'framer-motion';
 
 const PROJECT_STATUS_OPTIONS = [
@@ -27,7 +27,7 @@ const Notification = ({ show, onHide, message, type }) => {
     error: "bg-red-500",
   };
   
-  const Icon = type === 'success' ? CheckCircle : AlertTriangle;
+  const Icon = type === 'success' ? CheckCircleIcon : ExclamationTriangleIcon;
   
   return (
     <div className={`${baseClasses} ${typeClasses[type]}`}>
@@ -103,7 +103,7 @@ export default function ProjectCreation() {
         "Account": [parseInt(accountId)],
         "Project Value": projectValue ? parseFloat(projectValue) : null,
         "Project Description": projectDescription.trim(),
-        "Project Owner": [localStorage.getItem("secretKey")] // FIX: Use secretKey in array format
+        "Project Owner": [localStorage.getItem("secretKey")]
       };
 
       await createProject(projectData);
