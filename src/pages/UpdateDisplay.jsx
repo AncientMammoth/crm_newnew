@@ -34,7 +34,6 @@ export default function UpdateDisplay({ update, userName, expanded, onExpand }) 
           </button>
         )}
         <Link to={`/updates/${update.id}`} className="text-xs text-accent hover:underline font-medium">
-          View Details
         </Link>
       </div>
     </div>
