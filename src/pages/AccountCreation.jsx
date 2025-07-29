@@ -2,7 +2,8 @@ import React, { useState, Fragment } from "react";
 import { createAccount } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { BuildingOfficeIcon, AlertTriangle, CheckCircle } from "lucide-react";
+import { BuildingOfficeIcon } from "@heroicons/react/24/outline"; // Corrected import
+import { AlertTriangle, CheckCircle } from "lucide-react"; // Kept for notifications
 import { motion } from 'framer-motion';
 
 const ACCOUNT_TYPE_OPTIONS = [
@@ -17,7 +18,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-// A reusable Toast Notification component
+// A reusable Toast Notification component (no changes needed here)
 const Notification = ({ show, onHide, message, type }) => {
   if (!show) return null;
 
@@ -92,10 +93,10 @@ export default function AccountCreation() {
         "Account Name": accountName.trim(),
         "Account Type": accountType,
         "Account Description": accountDescription.trim(),
-        "Account Owner": [localStorage.getItem("secretKey")]
+        "Account Owner": [localStorage.getItem("secretKey")] //
       };
 
-      await createAccount(accountData);
+      await createAccount(accountData); //
 
       showNotification("Account created successfully!", "success");
 
