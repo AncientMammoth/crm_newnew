@@ -6,11 +6,10 @@ import { Folder, Calendar, AlertTriangle, CheckCircle, Briefcase } from "lucide-
 import { motion } from 'framer-motion';
 
 const PROJECT_STATUS_OPTIONS = [
-  "Not Started",
-  "In Progress",
-  "On Hold",
-  "Completed",
-  "Cancelled"
+  "Negotiation",
+  "Need Analysis",
+  "Closed Won",
+  "Closed Lost",
 ];
 
 function classNames(...classes) {

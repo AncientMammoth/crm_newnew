@@ -1,9 +1,9 @@
-import React, { useState, Fragment } from "react";
+import React, { useState, Fragment, useEffect } from "react";
 import { createAccount } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { BuildingOfficeIcon } from "@heroicons/react/24/outline"; // Corrected import
-import { AlertTriangle, CheckCircle } from "lucide-react"; // Kept for notifications
+import { BuildingOfficeIcon } from "@heroicons/react/24/outline";
+import { AlertTriangle, CheckCircle, User } from "lucide-react";
 import { motion } from 'framer-motion';
 
 const ACCOUNT_TYPE_OPTIONS = [
@@ -18,7 +18,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
-// A reusable Toast Notification component (no changes needed here)
+// A reusable Toast Notification component
 const Notification = ({ show, onHide, message, type }) => {
   if (!show) return null;
 
@@ -53,9 +53,17 @@ export default function AccountCreation() {
   const [accountName, setAccountName] = useState("");
   const [accountType, setAccountType] = useState(ACCOUNT_TYPE_OPTIONS[0]);
   const [accountDescription, setAccountDescription] = useState("");
+  const [ownerName, setOwnerName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    // Retrieve the user's name from localStorage.
+    // Fallback to "Current User" if a name isn't stored.
+    const name = localStorage.getItem("userName") || "Current User";
+    setOwnerName(name);
+  }, []);
 
   const showNotification = (message, type = 'success') => {
     setNotification({ show: true, message, type });
@@ -93,10 +101,10 @@ export default function AccountCreation() {
         "Account Name": accountName.trim(),
         "Account Type": accountType,
         "Account Description": accountDescription.trim(),
-        "Account Owner": [localStorage.getItem("secretKey")] //
+        "Account Owner": [localStorage.getItem("secretKey")]
       };
 
-      await createAccount(accountData); //
+      await createAccount(accountData);
 
       showNotification("Account created successfully!", "success");
 
@@ -191,6 +199,25 @@ export default function AccountCreation() {
                   </div>
                 </Listbox>
               </div>
+
+              {/* New Disabled Account Owner Field */}
+              <div>
+                <label htmlFor="account-owner" className="block text-sm font-light text-muted-foreground mb-1">Account Owner</label>
+                <div className="relative">
+                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <User className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <input
+                        id="account-owner"
+                        name="Account Owner"
+                        type="text"
+                        value={ownerName}
+                        disabled
+                        className="appearance-none relative block w-full pl-10 pr-3 py-3 border border-border bg-secondary/50 placeholder-muted-foreground text-foreground rounded-md sm:text-sm disabled:cursor-not-allowed"
+                    />
+                </div>
+              </div>
+
 
               <div>
                 <label htmlFor="account-description" className="block text-sm font-light text-muted-foreground">Account Description</label>

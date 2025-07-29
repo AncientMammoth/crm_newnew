@@ -2,16 +2,14 @@ import React, { useState, Fragment, useEffect, useRef } from "react";
 import { createUpdate } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { Pencil, Calendar, AlertTriangle, CheckCircle, Briefcase, ListTodo } from "lucide-react";
+import { Pencil, Calendar, AlertTriangle, CheckCircle, Briefcase, ListTodo, User } from "lucide-react";
 import { motion } from 'framer-motion';
 
 const UPDATE_TYPE_OPTIONS = [
   "Call",
   "Email",
-  "Meeting",
-  "Follow-up",
-  "Internal Discussion",
-  "Client Update"
+  "Online Meeting",
+  "Physical Meeting"
 ];
 
 function classNames(...classes) {
@@ -60,12 +58,15 @@ export default function UpdateCreation() {
   });
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [ownerName, setOwnerName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     loadUserProjects();
+    const name = localStorage.getItem("userName") || "Current User";
+    setOwnerName(name);
   }, []);
 
   const loadUserProjects = async () => {
@@ -261,6 +262,25 @@ export default function UpdateCreation() {
                     </div>
                 </Listbox>
             </div>
+
+            {/* New Disabled Update Owner Field */}
+            <div>
+                <label htmlFor="update-owner" className="block text-sm font-light text-muted-foreground mb-1">Update Owner</label>
+                <div className="relative">
+                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <User className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <input
+                        id="update-owner"
+                        name="Update Owner"
+                        type="text"
+                        value={ownerName}
+                        disabled
+                        className="appearance-none relative block w-full pl-10 pr-3 py-3 border border-border bg-secondary/50 placeholder-muted-foreground text-foreground rounded-md sm:text-sm disabled:cursor-not-allowed"
+                    />
+                </div>
+              </div>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <Listbox value={fields["Update Type"]} onChange={value => setFields(f => ({...f, "Update Type": value}))}>
