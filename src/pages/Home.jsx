@@ -60,9 +60,8 @@ export default function Home() {
             .slice(0, 5);
     }, [allTasks]);
     
-    // UPDATED: Added "New Order"
     const quickActions = [
-        { title: "New Order", link: "/project-delivery/new", Icon: ShoppingCartIcon },
+        { title: "New Order", link: "/delivery/create", Icon: ShoppingCartIcon },
         { title: "New Task", link: "/create-task", Icon: PlusIcon },
         { title: "New Project", link: "/create-project", Icon: PlusIcon },
         { title: "New Update", link: "/create-update", Icon: PlusIcon },
@@ -85,12 +84,12 @@ export default function Home() {
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="mb-10"
+                    className="mb-10 text-center" // Centered the header text
                 >
-                    <h1 className="text-4xl font-light text-foreground">
+                    <h1 className="text-5xl font-light text-foreground"> {/* Increased font size */}
                         Welcome back, {userName}
                     </h1>
-                    <p className="mt-1 text-lg text-muted-foreground">
+                    <p className="mt-2 text-lg text-muted-foreground">
                         Today is {today}.
                     </p>
                 </motion.header>
@@ -106,10 +105,9 @@ export default function Home() {
                         className="lg:col-span-3 space-y-8"
                     >
                         <section>
-                            <h2 className="text-xl font-light text-foreground mb-5">Key Metrics</h2>
+                            <h2 className="text-xl font-light text-foreground mb-5 text-left">Key Metrics</h2>
                             <div className="space-y-5">
                                 {summaryStats.map(stat => (
-                                    // UPDATED: Wrapped card in a Link and made it a hover group
                                     <Link to={stat.link} key={stat.title} className="block group relative">
                                         <Card className="transition-all duration-300 group-hover:bg-[#3a3a3a]">
                                             <div className="flex items-center justify-between">
@@ -138,20 +136,20 @@ export default function Home() {
                         transition={{ duration: 0.5, delay: 0.4 }}
                         className="lg:col-span-6"
                     >
-                        <section className="relative group">
+                        <section>
                              <div className="flex items-center justify-between mb-5">
                                 <h2 className="text-xl font-light text-foreground">Upcoming Tasks</h2>
                                 <Link to="/my-tasks" className="text-sm font-light text-muted-foreground hover:text-white">
                                     View all &rarr;
                                 </Link>
                             </div>
-                            <Card className="p-0 overflow-hidden transition-all duration-300 group-hover:bg-[#3a3a3a]">
+                            <Card className="p-0 overflow-hidden transition-all duration-300">
                                 {tasksLoading ? (
                                     <p className="p-10 text-center text-muted-foreground">Loading tasks...</p>
                                 ) : upcomingTasks.length > 0 ? (
                                     <ul className="divide-y divide-border">
                                         {upcomingTasks.map(task => (
-                                            <li key={task.id} className="px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                                            <li key={task.id} className="px-6 py-4 flex flex-wrap items-center justify-between gap-4 hover:bg-[#3a3a3a] transition-colors">
                                                 <div>
                                                     <p className="font-light text-foreground">{task.fields["Task Name"]}</p>
                                                     <p className="text-sm text-muted-foreground">{task.fields["Project Name"]?.[0] || 'N/A'}</p>
@@ -174,11 +172,6 @@ export default function Home() {
                                     </div>
                                 )}
                             </Card>
-                            <ShineBorder 
-                                className="absolute inset-0 top-12 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                                borderWidth={1}
-                                shineColor={["#67F5C8", "#ADFF15", "#F1FA38"]}
-                            />
                         </section>
                     </motion.div>
 
