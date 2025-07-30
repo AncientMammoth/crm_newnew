@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { fetchTasksByIds } from '../api';
+import { ShineBorder } from '../components/ui/ShineBorder'; // Import the ShineBorder component
 
 // Heroicons imports
 import {
@@ -12,9 +13,10 @@ import {
     PlusIcon,
     CheckCircleIcon,
     ClockIcon,
+    ShoppingCartIcon, // Icon for New Order
 } from '@heroicons/react/24/outline';
 
-// Restored the previous status colors for the desired aesthetic
+// Status colors remain the same
 const STATUS_COLORS = {
     "To Do": "bg-gray-500/20 text-gray-300",
     "In Progress": "bg-blue-500/20 text-blue-300",
@@ -58,11 +60,13 @@ export default function Home() {
             .slice(0, 5);
     }, [allTasks]);
     
+    // UPDATED: Added "New Order"
     const quickActions = [
-        { title: "New Task", link: "/create-task" },
-        { title: "New Project", link: "/create-project" },
-        { title: "New Update", link: "/create-update" },
-        { title: "New Account", link: "/create-account" },
+        { title: "New Order", link: "/project-delivery/new", Icon: ShoppingCartIcon },
+        { title: "New Task", link: "/create-task", Icon: PlusIcon },
+        { title: "New Project", link: "/create-project", Icon: PlusIcon },
+        { title: "New Update", link: "/create-update", Icon: PlusIcon },
+        { title: "New Account", link: "/create-account", Icon: PlusIcon },
     ];
 
     // Card component for DRY code
@@ -105,15 +109,23 @@ export default function Home() {
                             <h2 className="text-xl font-light text-foreground mb-5">Key Metrics</h2>
                             <div className="space-y-5">
                                 {summaryStats.map(stat => (
-                                    <Card key={stat.title}>
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center">
-                                                <stat.Icon className="h-6 w-6 text-muted-foreground" />
-                                                <h3 className="text-md font-light text-foreground ml-3">{stat.title}</h3>
+                                    // UPDATED: Wrapped card in a Link and made it a hover group
+                                    <Link to={stat.link} key={stat.title} className="block group relative">
+                                        <Card className="transition-all duration-300 group-hover:bg-[#3a3a3a]">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center">
+                                                    <stat.Icon className="h-6 w-6 text-muted-foreground" />
+                                                    <h3 className="text-md font-light text-foreground ml-3">{stat.title}</h3>
+                                                </div>
+                                                <p className="text-3xl font-light text-foreground">{stat.count}</p>
                                             </div>
-                                            <p className="text-3xl font-light text-foreground">{stat.count}</p>
-                                        </div>
-                                    </Card>
+                                        </Card>
+                                        <ShineBorder 
+                                            className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                            borderWidth={1}
+                                            shineColor={["#67F5C8", "#ADFF15", "#F1FA38"]}
+                                        />
+                                    </Link>
                                 ))}
                             </div>
                         </section>
@@ -126,20 +138,20 @@ export default function Home() {
                         transition={{ duration: 0.5, delay: 0.4 }}
                         className="lg:col-span-6"
                     >
-                        <section>
-                            <div className="flex items-center justify-between mb-5">
+                        <section className="relative group">
+                             <div className="flex items-center justify-between mb-5">
                                 <h2 className="text-xl font-light text-foreground">Upcoming Tasks</h2>
                                 <Link to="/my-tasks" className="text-sm font-light text-muted-foreground hover:text-white">
                                     View all &rarr;
                                 </Link>
                             </div>
-                            <Card className="p-0 overflow-hidden">
+                            <Card className="p-0 overflow-hidden transition-all duration-300 group-hover:bg-[#3a3a3a]">
                                 {tasksLoading ? (
                                     <p className="p-10 text-center text-muted-foreground">Loading tasks...</p>
                                 ) : upcomingTasks.length > 0 ? (
                                     <ul className="divide-y divide-border">
                                         {upcomingTasks.map(task => (
-                                            <li key={task.id} className="px-6 py-4 flex flex-wrap items-center justify-between gap-4 hover:bg-white/5 transition-colors">
+                                            <li key={task.id} className="px-6 py-4 flex flex-wrap items-center justify-between gap-4">
                                                 <div>
                                                     <p className="font-light text-foreground">{task.fields["Task Name"]}</p>
                                                     <p className="text-sm text-muted-foreground">{task.fields["Project Name"]?.[0] || 'N/A'}</p>
@@ -162,6 +174,11 @@ export default function Home() {
                                     </div>
                                 )}
                             </Card>
+                            <ShineBorder 
+                                className="absolute inset-0 top-12 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                borderWidth={1}
+                                shineColor={["#67F5C8", "#ADFF15", "#F1FA38"]}
+                            />
                         </section>
                     </motion.div>
 
@@ -175,14 +192,22 @@ export default function Home() {
                          <section>
                             <h2 className="text-xl font-light text-foreground mb-5">Quick Actions</h2>
                             <div className="flex flex-col gap-4">
-                                {quickActions.map(action => (
-                                    <Link key={action.title} to={action.link}>
-                                        <button className="w-full text-left font-light text-base px-4 py-4 bg-[#333333] hover:bg-[#2E2E2E] text-foreground border border-transparent rounded-lg flex items-center transition-colors">
-                                            <PlusIcon className="h-5 w-5 mr-3 text-muted-foreground"/> 
-                                            {action.title}
-                                        </button>
-                                    </Link>
-                                ))}
+                                {quickActions.map(action => {
+                                    const ActionIcon = action.Icon;
+                                    return (
+                                        <Link key={action.title} to={action.link} className="relative group">
+                                            <button className="w-full text-left font-light text-base px-4 py-4 bg-[#333333] group-hover:bg-[#3a3a3a] text-foreground border border-transparent rounded-lg flex items-center transition-colors">
+                                                <ActionIcon className="h-5 w-5 mr-3 text-muted-foreground"/> 
+                                                {action.title}
+                                            </button>
+                                            <ShineBorder 
+                                                className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                                borderWidth={1}
+                                                shineColor={["#67F5C8", "#ADFF15", "#F1FA38"]}
+                                            />
+                                        </Link>
+                                    )
+                                })}
                             </div>
                         </section>
                     </motion.div>
