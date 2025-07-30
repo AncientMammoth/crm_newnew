@@ -154,7 +154,7 @@ export default function Home() {
                                 </Link>
                             </div>
                              <div className="bg-[#2a2a2a] border border-gray-700/50 rounded-lg">
-                                {isLoading ? (
+                                {tasksLoading ? ( // CORRECTED: Was 'isLoading', now 'tasksLoading'
                                     <p className="p-6 text-center text-gray-400">Loading your tasks...</p>
                                 ) : upcomingTasks.length > 0 ? (
                                     <ul className="divide-y divide-gray-700/50">
