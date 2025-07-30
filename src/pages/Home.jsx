@@ -59,7 +59,7 @@ export default function Home() {
     return (
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12 space-y-24">
 
-            {/* Section 1: Welcome Header with updated font styles */}
+            {/* Section 1: Welcome Header */}
             <motion.header 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -73,59 +73,17 @@ export default function Home() {
                     Here's a snapshot of your workspace. Let's get things done.
                 </p>
             </motion.header>
-
-            {/* Section 2: Summary Stat Cards with LOCALIZED aurora background */}
-            <motion.section
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                aria-labelledby="summary-heading"
-                className="relative" // Parent container for the aurora
-            >
-                {/* THIS IS THE AURORA DIV - It sits behind the cards 
-                <div 
-                  className="absolute -top-32 left-1/2 -z-10 h-[40rem] w-[60rem] -translate-x-1/2 [background:radial-gradient(50%_50%_at_50%_50%,#7634d2_0%,rgba(255,255,255,0)_100%)] opacity-20"
-                  aria-hidden="true" 
-                />*/}
-
-                <h2 id="summary-heading" className="sr-only">Summary Statistics</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {summaryStats.map((stat) => (
-                        <div key={stat.title} className="relative group">
-                            <div className="relative bg-[#333333] border border-border rounded-2xl p-6 flex flex-col justify-between h-full transition-all duration-300 group-hover:shadow-2xl group-hover:-translate-y-1">
-                                <ShineBorder
-                                    className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                                    shineColor={["#67F5C8", "#ADFF15", "#F1FA38"]}
-                                    borderWidth={2}
-                                />
-                                <div className="relative z-10">
-                                    <stat.Icon className="h-8 w-8 text-muted-foreground mb-4" />
-                                    {/* CHANGED: font-semibold to font-light */}
-                                    <h3 className="text-lg font-light text-foreground">{stat.title}</h3>
-                                    {/* NOTE: Kept font-bold here for emphasis on the number */}
-                                    <p className="text-5xl font-light text-foreground my-2">{stat.count}</p>
-                                </div>
-                                <Link to={stat.link} className="relative z-10 mt-4 text-sm font-medium text-muted-foreground hover:text-white flex items-center">
-                                    View {stat.title}
-                                    <ArrowTopRightOnSquareIcon className="h-4 w-4 ml-1.5" />
-                                </Link>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </motion.section>
-
-            {/* Section 3: Upcoming Tasks & Quick Actions */}
+            
+            {/* Section 2: REORGANIZED - Upcoming Tasks & Quick Actions now have priority */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
                 <motion.section 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.4 }}
+                    transition={{ duration: 0.5, delay: 0.2 }} // Adjusted delay
                     className="lg:col-span-2" 
                     aria-labelledby="tasks-heading"
                 >
                     <div className="flex items-center justify-between mb-6">
-                        {/* CHANGED: font-semibold to font-light */}
                         <h2 id="tasks-heading" className="text-2xl font-light text-foreground flex items-center">
                             <ListBulletIcon className="h-6 w-6 mr-3 text-muted-foreground" />
                             Upcoming Tasks
@@ -142,7 +100,6 @@ export default function Home() {
                                 {upcomingTasks.map((task) => (
                                     <li key={task.id} className="p-5 hover:bg-white/5 transition-colors duration-200 flex flex-col sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex-1 mb-3 sm:mb-0">
-                                            {/* CHANGED: font-semibold to font-light */}
                                             <p className="font-light text-foreground">{task.fields["Task Name"]}</p>
                                             <p className="text-sm text-muted-foreground mt-1">
                                                 Project: <Link to={`/projects/${task.fields.Project[0]}`} className="hover:underline">{task.fields["Project Name"]?.[0] || 'N/A'}</Link>
@@ -152,7 +109,6 @@ export default function Home() {
                                             <div className={`text-xs font-medium px-3 py-1 rounded-full ${STATUS_COLORS[task.fields.Status] || 'bg-gray-500/20 text-gray-300'}`}>
                                                 {task.fields.Status}
                                             </div>
-                                            {/* CHANGED: font-semibold to font-light */}
                                             <div className="flex items-center text-sm text-red-400 font-light">
                                                 <CalendarDaysIcon className="h-4 w-4 mr-1.5" />
                                                 Due: {new Date(task.fields["Due Date"]).toLocaleDateString()}
@@ -163,7 +119,6 @@ export default function Home() {
                             </ul>
                         ) : (
                             <div className="text-center text-muted-foreground p-12">
-                                {/* CHANGED: font-semibold to font-light */}
                                 <h3 className="font-light text-lg">All caught up!</h3>
                                 <p className="mt-1">You have no upcoming tasks. Great job!</p>
                             </div>
@@ -174,10 +129,9 @@ export default function Home() {
                 <motion.section 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.6 }}
+                    transition={{ duration: 0.5, delay: 0.4 }} // Adjusted delay
                     aria-labelledby="actions-heading"
                 >
-                    {/* CHANGED: font-semibold to font-light */}
                     <h2 id="actions-heading" className="text-2xl font-light text-foreground mb-6">Quick Actions</h2>
                     <div className="flex flex-col gap-4">
                         <Link to="/create-account">
@@ -195,6 +149,40 @@ export default function Home() {
                     </div>
                 </motion.section>
             </div>
+
+            {/* Section 3: REORGANIZED - Summary Stat Cards are now last */}
+            <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                aria-labelledby="summary-heading"
+                className="relative"
+            >
+                <h2 id="summary-heading" className="sr-only">Summary Statistics</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {summaryStats.map((stat) => (
+                        <div key={stat.title} className="relative group">
+                            <div className="relative bg-[#333333] border border-border rounded-2xl p-6 flex flex-col justify-between h-full transition-all duration-300 group-hover:shadow-2xl group-hover:-translate-y-1">
+                                <ShineBorder
+                                    className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                    shineColor={["#67F5C8", "#ADFF15", "#F1FA38"]}
+                                    borderWidth={2}
+                                />
+                                <div className="relative z-10">
+                                    <stat.Icon className="h-8 w-8 text-muted-foreground mb-4" />
+                                    <h3 className="text-lg font-light text-foreground">{stat.title}</h3>
+                                    <p className="text-5xl font-light text-foreground my-2">{stat.count}</p>
+                                </div>
+                                <Link to={stat.link} className="relative z-10 mt-4 text-sm font-medium text-muted-foreground hover:text-white flex items-center">
+                                    View {stat.title}
+                                    <ArrowTopRightOnSquareIcon className="h-4 w-4 ml-1.5" />
+                                </Link>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </motion.section>
+
         </div>
     );
 }
