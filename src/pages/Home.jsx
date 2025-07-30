@@ -61,7 +61,7 @@ export default function Home() {
     }, [allTasks]);
     
     const quickActions = [
-        { title: "New Order", link: "/delivery/create", Icon: ShoppingCartIcon },
+        { title: "New Order", link: "/delivery/create", Icon: PlusIcon },
         { title: "New Task", link: "/create-task", Icon: PlusIcon },
         { title: "New Project", link: "/create-project", Icon: PlusIcon },
         { title: "New Update", link: "/create-update", Icon: PlusIcon },
