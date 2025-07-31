@@ -5,9 +5,7 @@ import {
   fetchAllUpdates,
   processUpdatesByProject,
   createUpdate,
-  updateUser,
-  formatDateForAirtable,
-  fetchAccountsByIds, // Import the function to fetch accounts
+  fetchAccountsByIds,
 } from "../api";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
@@ -16,14 +14,12 @@ import UpdateDisplay from "./UpdateDisplay";
 import { motion } from "framer-motion";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
-
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
 function getTodayIST() {
   const now = new Date();
-  // Adjust to IST
   const utc = now.getTime() + now.getTimezoneOffset() * 60000;
   const ist = new Date(utc + 5.5 * 60 * 60000);
   return ist.toISOString().slice(0, 10);
@@ -61,7 +57,8 @@ export default function Projects() {
   const [statusFilter, setStatusFilter] = useState("");
   const [successProjectId, setSuccessProjectId] = useState(null);
 
-  const updateOwnerId = localStorage.getItem("userRecordId") || "";
+  // --- FIX: Use secretKey for the update owner ---
+  const updateOwnerId = localStorage.getItem("secretKey") || ""; 
   const userName = localStorage.getItem("userName") || "Current User";
   
   const [projectIds] = useState(() => JSON.parse(localStorage.getItem("projectIds") || "[]"));
@@ -86,14 +83,12 @@ export default function Projects() {
     queryFn: fetchAllUpdates,
   });
 
-  // Fetch all accounts to get their full names
   const { data: accountsData } = useQuery({
     queryKey: ["accounts", accountIds],
     queryFn: () => fetchAccountsByIds(accountIds),
     enabled: accountIds.length > 0,
   });
   
-  // Create a lookup map for account names
   const accountMap = useMemo(() => {
     if (!accountsData) return new Map();
     return new Map(accountsData.map(acc => [acc.id, acc.fields["Account Name"]]));
@@ -108,45 +103,31 @@ export default function Projects() {
 
   useEffect(() => {
     if (allUpdates.length > 0 && projectIds.length > 0 && !updatesLoading) {
-      const formattedDate = formatDateForAirtable(selectedDate);
-      
       const filtered = {};
       Object.keys(processedUpdates).forEach((projectId) => {
         const projectUpdates = processedUpdates[projectId] || [];
         const updatesForDate = projectUpdates.filter(
-          (update) => update.fields.Date === formattedDate
+          (update) => new Date(update.fields.Date).toISOString().slice(0, 10) === selectedDate
         );
-        filtered[projectId] =
-          updatesForDate.length > 0 ? updatesForDate[0] : null;
+        filtered[projectId] = updatesForDate.length > 0 ? updatesForDate[0] : null;
       });
-      
       setFilteredUpdatesByProject(filtered);
     }
   }, [selectedDate, processedUpdates, updatesLoading, projectIds]);
 
   const createUpdateMutation = useMutation({
     mutationFn: async ({ projectId, notes, updateType }) => {
-      const update = await createUpdate({
-        Notes: notes,
-        Date: selectedDate,
+      // The createUpdate function (which uses createRecord) will trigger the global data refresh
+      return await createUpdate({
+        "Notes": notes,
+        "Date": selectedDate,
         "Update Type": updateType,
-        Project: projectId, // Corrected this line
-        "Update Owner": updateOwnerId, // Corrected this line
+        "Project": projectId,
+        "Update Owner": updateOwnerId,
       });
-
-      if (update && update.id && updateOwnerId) {
-        const prevUpdates = JSON.parse(
-          localStorage.getItem("updateIds") || "[]"
-        );
-        const updatedUpdates = [...new Set([...prevUpdates, update.id])];
-        await updateUser(updateOwnerId, { Updates: updatedUpdates });
-        localStorage.setItem("updateIds", JSON.stringify(updatedUpdates));
-      }
-
-      return update;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({queryKey: ["allUpdates"]});
+      queryClient.invalidateQueries({queryKey: ["allUpdates"]}); // Still good to invalidate for immediate feedback
       setSuccessProjectId(variables.projectId);
       
       setTimeout(() => {
@@ -162,21 +143,23 @@ export default function Projects() {
   });
 
   const handleDateChange = (date) => setSelectedDate(date);
-  const handleNotesChange = (projectId, value) =>
-    setNotesByProject((prev) => ({ ...prev, [projectId]: value }));
-  const handleTypeChange = (projectId, value) =>
-    setUpdateTypeByProject((prev) => ({ ...prev, [projectId]: value }));
+  const handleNotesChange = (projectId, value) => setNotesByProject((prev) => ({ ...prev, [projectId]: value }));
+  const handleTypeChange = (projectId, value) => setUpdateTypeByProject((prev) => ({ ...prev, [projectId]: value }));
+  
   const handleCreateUpdate = (projectId) => {
     const notes = notesByProject[projectId]?.trim();
     const updateType = updateTypeByProject[projectId] || "Call";
     setErrorByProject((prev) => ({ ...prev, [projectId]: undefined }));
-    if (!notes || !updateType) return;
+    if (!notes || !updateType) {
+      setErrorByProject((prev) => ({...prev, [projectId]: "Notes cannot be empty."}));
+      return;
+    };
     createUpdateMutation.mutate(
       { projectId, notes, updateType },
       {
         onSuccess: () => {
           setNotesByProject((prev) => ({ ...prev, [projectId]: "" }));
-          setUpdateTypeByProject((prev) => ({ ...prev, [projectId]: "" }));
+          setUpdateTypeByProject((prev) => ({ ...prev, [projectId]: "Call" }));
         },
       }
     );
@@ -195,9 +178,7 @@ export default function Projects() {
         const search = searchTerm.toLowerCase();
 
         const matchesSearch = name.includes(search) || status.includes(search);
-        const matchesStatus = statusFilter
-        ? status === statusFilter.toLowerCase()
-        : true;
+        const matchesStatus = statusFilter ? status === statusFilter.toLowerCase() : true;
 
         return matchesSearch && matchesStatus;
     });
@@ -234,7 +215,7 @@ export default function Projects() {
                             )}
                             title={date}
                         >
-                            {new Date(date).toLocaleDateString(undefined, {
+                            {new Date(date + 'T00:00:00').toLocaleDateString(undefined, {
                             month: "short",
                             day: "numeric",
                             })}
@@ -359,15 +340,13 @@ export default function Projects() {
                                     setExpandedNote({ projectId: record.id, update })
                                 }
                                 userName={userName}
-                                updateOwnerId={updateOwnerId}
-                                fullAccountName={fullAccountName} // Pass the full name down
+                                fullAccountName={fullAccountName}
                             />
                         );
                     })
                     )}
                 </div>
             )}
-
 
             {expandedNote && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 transition-all backdrop-blur-sm">
