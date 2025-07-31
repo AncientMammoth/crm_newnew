@@ -149,16 +149,11 @@ export default function ProjectCreation() {
 
       showNotification("Project created successfully!", "success");
 
-      // Reset form
-      setFields({
-        "Project Name": "",
-        "Project Status": PROJECT_STATUS_OPTIONS[0],
-        "Start Date": "",
-        "End Date": "",
-        "Account": null,
-        "Project Value": "",
-        "Project Description": ""
-      });
+      // After a short delay to allow the user to see the notification,
+      // reload the page to reflect the changes.
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500); // 1.5-second delay before reload
 
     } catch (error) {
       console.error("Failed to create project:", error);
@@ -166,9 +161,9 @@ export default function ProjectCreation() {
         error.response?.data?.error || "Failed to create project. Please try again.",
         "error"
       );
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Only set this back on error, as success will reload.
     }
+    // No need for a `finally` block as the page will reload on success.
   };
 
   return (
