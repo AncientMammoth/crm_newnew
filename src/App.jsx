@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import React from "react";
+import React, { useEffect } from "react";
+import { setOnDataChangeCallback } from "./api";
 
 // Page & Component Imports
 import Login from "./pages/Login";
@@ -48,15 +49,13 @@ import MyProjectDeliveries from './pages/MyProjectDeliveries';
 // Route Guards and Redirects
 function PrivateRoute({ children, allowedRoles }) {
   const secretKey = localStorage.getItem("secretKey");
-  const userRole = localStorage.getItem("userRole"); // Get user role from local storage
+  const userRole = localStorage.getItem("userRole");
 
   if (!secretKey) {
     return <Navigate to="/login" />;
   }
 
-  // Check if the user's role is allowed for this route
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    // If not allowed, redirect to home or login based on whether they are logged in
     return <Navigate to={userRole === 'admin' ? '/admin/dashboard' : userRole === 'delivery_head' ? '/delivery-head/dashboard' : '/home'} />;
   }
 
@@ -73,7 +72,7 @@ function HomeRedirect() {
         } else if (userRole === "delivery_head") {
             return <Navigate to="/delivery-head/dashboard" />;
         } else {
-            return <Navigate to="/home" />; // Default for sales_executive
+            return <Navigate to="/home" />;
         }
     }
     
@@ -81,6 +80,23 @@ function HomeRedirect() {
 }
 
 export default function App() {
+  
+  useEffect(() => {
+    setOnDataChangeCallback((freshUserData) => {
+      console.log("Data changed. Updating localStorage.");
+      
+      localStorage.setItem("userName", freshUserData.user_name || "User");
+      localStorage.setItem("userId", freshUserData.id);
+      localStorage.setItem("userRole", freshUserData.role);
+      localStorage.setItem("accountIds", JSON.stringify(freshUserData.accounts?.map(acc => acc.id) || []));
+      localStorage.setItem("projectIds", JSON.stringify(freshUserData.projects?.map(proj => proj.id) || []));
+      localStorage.setItem("taskIdsAssigned", JSON.stringify(freshUserData.tasks_assigned_to?.map(task => task.id) || []));
+      localStorage.setItem("taskIdsCreated", JSON.stringify(freshUserData.tasks_created_by?.map(task => task.id) || []));
+      localStorage.setItem("updateIds", JSON.stringify(freshUserData.updates?.map(update => update.id) || []));
+      localStorage.setItem("deliveryStatusIds", JSON.stringify(freshUserData.delivery_statuses?.map(ds => ds.id) || []));
+    });
+  }, []);
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -109,10 +125,9 @@ export default function App() {
         <Route path="create-task" element={<CreateTask />} />
         <Route path="my-tasks" element={<Tasks />} />
         <Route path="tasks/:taskId" element={<TaskDetail />} />
-        {/* New Delivery Status Routes for Sales Executive */}
-        <Route path="delivery" element={<MyProjectDeliveries />} /> {/* List of their own deliveries */}
-        <Route path="delivery/create" element={<ProjectDeliveryForm />} /> {/* Form to create/edit */}
-        <Route path="delivery/edit/:id" element={<ProjectDeliveryForm />} /> {/* Edit existing delivery status */}
+        <Route path="delivery" element={<MyProjectDeliveries />} />
+        <Route path="delivery/create" element={<ProjectDeliveryForm />} />
+        <Route path="delivery/edit/:id" element={<ProjectDeliveryForm />} />
       </Route>
 
       {/* Admin Routes */}

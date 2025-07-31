@@ -1,5 +1,38 @@
 import axios from 'axios';
 
+// --- Global Data Refresh Mechanism ---
+let onDataChangeCallback = null;
+
+/**
+ * Registers a callback function that the API module can use to 
+ * notify the React UI that its state is stale and needs updating.
+ * @param {Function} callback The function to call with the new user data.
+ */
+export function setOnDataChangeCallback(callback) {
+  onDataChangeCallback = callback;
+}
+
+/**
+ * Fetches the latest user data bundle from the server and passes it
+ * to the registered UI callback.
+ */
+export async function triggerDataRefresh() {
+    if (onDataChangeCallback) {
+        const secretKey = localStorage.getItem('secretKey');
+        if (secretKey) {
+            try {
+                console.log("Data changed. Refetching all user data...");
+                // Re-fetch all user data, just like on login
+                const freshUserData = await fetchUserBySecretKey(secretKey);
+                // Call the callback to update the UI's state
+                onDataChangeCallback(freshUserData);
+            } catch (error) {
+                console.error("Failed to refetch user data after change:", error);
+            }
+        }
+    }
+}
+
 // --- Axios API Client ---
 export const api = axios.create({
   baseURL: '/api', // This is correctly set for Vercel rewrites
@@ -36,9 +69,7 @@ async function apiRequest(path, options = {}) {
 }
 
 // =================================================================
-// DATA FORMATTING HELPERS (These are for formatting backend responses
-// to the old Airtable-like structure if needed by other parts of the frontend,
-// but the login response will be handled directly in fetchUserBySecretKey)
+// DATA FORMATTING HELPERS
 // =================================================================
 
 const formatAccount = (acc) => ({
@@ -103,25 +134,21 @@ const formatUpdate = (update) => ({
 // API FUNCTIONS
 // =================================================================
 
-// MODIFIED: To correctly parse the new backend login response structure
 export async function fetchUserBySecretKey(secretKey) {
   try {
     const response = await api.post('/auth/login', { secretKey });
     const { user, accounts, projects, tasks_assigned_to, tasks_created_by, updates, delivery_statuses } = response.data;
     
-    // Return the data in a structure that Login.jsx expects,
-    // which is closer to the raw backend response now,
-    // but still compatible with how Login.jsx uses it.
     return {
-      id: user.id, // Backend now returns user.id directly
-      user_name: user.user_name, // Backend returns user.user_name
-      role: user.role, // Backend returns user.role
-      accounts: accounts, // Pass raw arrays
+      id: user.id,
+      user_name: user.user_name,
+      role: user.role,
+      accounts: accounts,
       projects: projects,
       tasks_assigned_to: tasks_assigned_to,
       tasks_created_by: tasks_created_by,
       updates: updates,
-      delivery_statuses: delivery_statuses, // New: Include delivery statuses
+      delivery_statuses: delivery_statuses,
     };
   } catch (err) {
     console.error("Authentication error in api/index.js (fetchUserBySecretKey):", err.response?.data || err.message);
@@ -137,12 +164,15 @@ export async function fetchAllUsers() {
 export async function createRecord(table, fields) {
   const endpoint = table.toLowerCase();
   const result = await apiRequest(endpoint, { method: 'POST', body: fields });
+  await triggerDataRefresh();
   return { id: result.id, fields: result };
 }
 
 export async function updateRecord(table, id, fields) {
   const endpoint = `${table.toLowerCase()}/${id}`;
-  return await apiRequest(endpoint, { method: 'PATCH', body: fields });
+  const result = await apiRequest(endpoint, { method: 'PATCH', body: fields });
+  await triggerDataRefresh();
+  return result;
 }
 
 export async function fetchAccountsByIds(ids = []) {
@@ -163,15 +193,8 @@ export async function fetchTasksByIds(ids = []) {
   return tasks.map(formatTask);
 }
 
-/**
- * --- NEW FUNCTION ---
- * Fetches all tasks created by a specific user by their record ID.
- * @param {string} creatorId - The Airtable record ID of the user who created the tasks.
- * @returns {Array} An array of task objects.
- */
 export async function fetchTasksByCreator(creatorId) {
   if (!creatorId) return [];
-  // This assumes your backend has an endpoint like GET /api/tasks/by-creator/:id
   const tasks = await apiRequest(`tasks/by-creator/${creatorId}`);
   return tasks.map(formatTask);
 }
@@ -184,7 +207,6 @@ export async function fetchUpdatesByIds(ids = []) {
 
 export async function fetchUpdatesByProjectId(projectId) {
     if (!projectId) return [];
-    // This endpoint might not exist in your backend, adjust if necessary
     const updates = await apiRequest(`updates/by-project/${projectId}`); 
     return updates.map(formatUpdate);
 }
@@ -208,12 +230,11 @@ export const updateTask = (taskId, fields) => updateRecord("Tasks", taskId, fiel
 
 export async function fetchAllUsersForAdmin() {
     const users = await apiRequest("admin/users");
-    // Assuming backend returns 'role' now instead of 'user_type'
     return users.map(user => ({
         id: user.id,
         fields: {
             "User Name": user.user_name,
-            "User Type": user.role, // Map 'role' to 'User Type' for existing frontend components
+            "User Type": user.role,
             "Secret Key": user.airtable_id,
         }
     }));
@@ -257,7 +278,6 @@ export async function fetchAllUpdatesForAdmin(filters = {}) {
 export async function fetchAdminUserDetail(userId) {
   const data = await apiRequest(`admin/users/${userId}`);
   const formattedAccounts = data.accounts.map(formatAccount);
-  // Assuming user object now has 'role' instead of 'user_type'
   return { user: { ...data.user, user_type: data.user.role }, accounts: formattedAccounts };
 }
 

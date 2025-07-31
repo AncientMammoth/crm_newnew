@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
-import { api } from '../api';
+import { api, triggerDataRefresh } from '../api';
 
 // Helper to convert 'Yes'/'No'/'N/A' to boolean/null for backend
 const convertToBooleanOrNull = (value) => {
@@ -223,9 +223,9 @@ export default function ProjectDeliveryForm() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['myDeliveryStatuses']);
+      triggerDataRefresh();
       showNotification('Delivery status created successfully!');
-      setTimeout(() => navigate(-1), 2000); // Navigate back after 2 seconds
+      setTimeout(() => navigate(-1), 2000);
     },
     onError: (err) => {
       showNotification(err.message || 'Failed to create status.', 'error');
@@ -246,10 +246,9 @@ export default function ProjectDeliveryForm() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['myDeliveryStatuses']);
-      queryClient.invalidateQueries(['deliveryStatus', id]);
+      triggerDataRefresh();
       showNotification('Delivery status updated successfully!');
-      setTimeout(() => navigate(-1), 2000); // Navigate back after 2 seconds
+      setTimeout(() => navigate(-1), 2000);
     },
     onError: (err) => {
       showNotification(err.message || 'Failed to update status.', 'error');
